@@ -1,0 +1,64 @@
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
+import type { Database } from '@/types/database'
+
+/**
+ * Server-side Supabase client using the anon key.
+ * RLS applies. Use in Server Components and Server Actions for user-scoped reads.
+ */
+export async function createClient() {
+  const cookieStore = await cookies()
+
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Called from a Server Component — cookies cannot be set here.
+            // The middleware handles session refresh before this runs.
+          }
+        },
+      },
+    }
+  )
+}
+
+/**
+ * Service-role Supabase client — RLS is BYPASSED.
+ *
+ * Uses the base supabase-js client (not the SSR client) because service-role
+ * auth is key-based, not session-based. No cookie handling needed.
+ *
+ * Use only in Server Actions for writes that must bypass RLS:
+ *   - kana_ledger inserts
+ *   - audit_log inserts
+ *   - submission status transitions
+ *   - score_event inserts
+ *   - guardian_links creation
+ *   - auth.admin.* operations
+ *
+ * NEVER pass this client or its output to client-side code.
+ * NEVER use NEXT_PUBLIC_ prefix for SUPABASE_SERVICE_ROLE_KEY.
+ */
+export function createServiceClient() {
+  return createSupabaseClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  )
+}
