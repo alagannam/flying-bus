@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { LoginForm } from './LoginForm'
 
 export const metadata: Metadata = { title: 'Log in' }
@@ -9,7 +10,9 @@ export default function LoginPage() {
       <div style={styles.card}>
         <h1 style={styles.heading}>Welcome back</h1>
         <p style={styles.sub}>Log in to The Flying Bus</p>
-        <LoginForm />
+        <Suspense fallback={<div style={styles.formSkeleton} />}>
+          <LoginForm />
+        </Suspense>
         <p style={styles.join}>
           New here?{' '}
           <a href="/join/youth" style={styles.joinLink}>
@@ -59,5 +62,8 @@ const styles = {
   joinLink: {
     color: 'var(--color-primary)',
     fontWeight: 'var(--font-medium)',
+  },
+  formSkeleton: {
+    height: 148,
   },
 } as const

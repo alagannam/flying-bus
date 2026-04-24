@@ -45,7 +45,6 @@ const YOUTH_PREFIXES = [
   '/coins',
   '/notifications',
   '/settings',
-  '/profile',
 ]
 
 function isYouthPath(pathname: string): boolean {
