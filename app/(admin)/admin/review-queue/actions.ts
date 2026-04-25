@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { hasAdminAccess } from '@/lib/utils/permissions'
+import { checkAndAwardBadges } from '@/lib/badges'
 import type { AccountType } from '@/types/app'
 
 type ActionResult = { error?: string }
@@ -34,7 +35,13 @@ async function getStaffSession(): Promise<{ userId: string }> {
 // 2. Read the coin amount from platform_config (default 10).
 // 3. Publish the submission with an optimistic-lock update.
 // 4. Award coins via the atomic award_coins RPC.
-// 5. Notify the youth.
+// 5. Increment creator score and flip profile public if needed.
+// 6. Check and award badges for publish-relevant criteria.
+// 7. Notify the youth.
+//
+// Steps 4–6 are best-effort: errors are logged and do not block
+// the publish or the editor redirect. The submission is already
+// live at the point those steps run.
 
 export async function approveSubmission(
   id: string,
@@ -94,19 +101,47 @@ export async function approveSubmission(
     return { error: 'This submission was already reviewed by someone else.' }
   }
 
-  // Award coins — atomic: updates youth_profiles.coins_balance and inserts kana_ledger row.
-  // If this fails the submission is already published; log and continue so we don't
-  // block the editor. Coins can be corrected manually via the admin coins screen.
+  // Award coins — atomic RPC; updates coins_balance and appends a ledger row.
+  // Best-effort: submission is already live, so log and continue on failure.
+  // Coins can be corrected manually via the admin coins screen.
   const { error: coinsError } = await service.rpc('award_coins', {
     p_user_id: sub.youth_user_id,
     p_amount: coinAmount,
     p_reason: 'submission_approved',
     p_reference_id: id,
   })
-
   if (coinsError) {
     console.error('[approveSubmission] award_coins failed', { id, coinsError })
   }
+
+  // Increment creator score — same point value as coins for V1.
+  // Atomically updates creator_score and recalculates creator_level.
+  const { error: scoreError } = await service.rpc('increment_creator_score', {
+    p_user_id: sub.youth_user_id,
+    p_points: coinAmount,
+  })
+  if (scoreError) {
+    console.error('[approveSubmission] increment_creator_score failed', { id, scoreError })
+  }
+
+  // Make profile public if this is the creator's first published submission.
+  // Conditional: .eq('is_profile_public', false) is a no-op if already true,
+  // so repeated publishes never cause unnecessary writes.
+  await service
+    .from('youth_profiles')
+    .update({ is_profile_public: true })
+    .eq('user_id', sub.youth_user_id)
+    .eq('is_profile_public', false)
+
+  // Check and award badges. Runs after score and coin updates so profile
+  // stats are fresh. Idempotent — duplicates are silently ignored by DB.
+  await checkAndAwardBadges(
+    sub.youth_user_id,
+    service,
+    ['submissions_published', 'creator_score', 'coins_balance'],
+  ).catch(err => {
+    console.error('[approveSubmission] checkAndAwardBadges failed', { id, err })
+  })
 
   // Notify youth
   await service.from('notifications').insert({

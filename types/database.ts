@@ -34,6 +34,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      badge_definitions: {
+        Row: {
+          created_at: string
+          criteria_type: string
+          description: string
+          icon_emoji: string
+          name: string
+          slug: string
+          threshold: number | null
+        }
+        Insert: {
+          created_at?: string
+          criteria_type: string
+          description: string
+          icon_emoji?: string
+          name: string
+          slug: string
+          threshold?: number | null
+        }
+        Update: {
+          created_at?: string
+          criteria_type?: string
+          description?: string
+          icon_emoji?: string
+          name?: string
+          slug?: string
+          threshold?: number | null
+        }
+        Relationships: []
+      }
       club_memberships: {
         Row: {
           club_id: string
@@ -516,6 +546,42 @@ export type Database = {
         }
         Relationships: []
       }
+      youth_badges: {
+        Row: {
+          awarded_at: string
+          badge_slug: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          awarded_at?: string
+          badge_slug: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          awarded_at?: string
+          badge_slug?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youth_badges_badge_slug_fkey"
+            columns: ["badge_slug"]
+            isOneToOne: false
+            referencedRelation: "badge_definitions"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "youth_badges_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       youth_profiles: {
         Row: {
           age_band: Database["public"]["Enums"]["age_band"]
@@ -605,6 +671,11 @@ export type Database = {
           p_reference_id?: string
           p_user_id: string
         }
+        Returns: number
+      }
+      bump_streak: { Args: { p_user_id: string }; Returns: number }
+      increment_creator_score: {
+        Args: { p_points: number; p_user_id: string }
         Returns: number
       }
     }

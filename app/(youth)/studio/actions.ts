@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { checkAndAwardBadges } from '@/lib/badges'
 
 type ActionResult = { error?: string }
 
@@ -111,6 +112,23 @@ export async function createAndSubmit(formData: FormData): Promise<ActionResult>
       title: 'New submission waiting for your review',
       body: `Your child submitted "${title}" and needs your approval before it goes to the editors.`,
       reference_id: submission.id,
+    })
+  }
+
+  // Bump activity streak — tracks consecutive days of creative submission.
+  // Best-effort: errors are logged and do not block the redirect.
+  // bump_streak is idempotent for the same UTC day, so this is safe to call
+  // even if the youth submits multiple times in one day.
+  const { error: streakError } = await service.rpc('bump_streak', {
+    p_user_id: userId,
+  })
+  if (streakError) {
+    console.error('[createAndSubmit] bump_streak failed', { id: submission.id, streakError })
+  } else {
+    // Check streak badges only after a successful bump — streak_current is
+    // now fresh. Idempotent: already-earned badges are silently skipped.
+    await checkAndAwardBadges(userId, service, ['streak_current']).catch(err => {
+      console.error('[createAndSubmit] checkAndAwardBadges failed', { id: submission.id, err })
     })
   }
 
