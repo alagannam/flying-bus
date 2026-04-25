@@ -23,6 +23,7 @@ const PUBLIC_PREFIXES = [
   '/leaderboards',
   '/impact',
   '/profile',
+  '/submissions',
   '/join',
   '/login',
   '/account-restricted',
