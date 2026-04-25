@@ -82,13 +82,7 @@ export default async function SubmissionDetailPage(
 
   const { data: rawSub } = await supabase
     .from('submissions')
-    .select([
-      'id', 'title', 'body', 'status', 'club_id',
-      'created_at', 'submitted_at',
-      'parent_reviewed_at', 'parent_review_note',
-      'reviewed_at', 'review_note',
-      'published_at', 'coins_awarded',
-    ].join(', '))
+    .select('id, title, body, status, club_id, created_at, submitted_at, parent_reviewed_at, parent_review_note, reviewed_at, review_note, published_at, coins_awarded')
     .eq('id', id)
     .eq('youth_user_id', user.id)   // ownership check — defence beyond RLS
     .maybeSingle()
