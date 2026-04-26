@@ -11,8 +11,8 @@ export default function AccountRestrictedPage() {
         <p style={styles.body}>
           Your account has been suspended or is currently unavailable. If you
           believe this is a mistake, please contact us at{' '}
-          <a href="mailto:support@theflyingbus.com" style={styles.link}>
-            support@theflyingbus.com
+          <a href="mailto:support@theflyingbus.org" style={styles.link}>
+            support@theflyingbus.org
           </a>
           .
         </p>

@@ -15,12 +15,15 @@ export const metadata: Metadata = {
     template: '%s | The Flying Bus',
   },
   description: 'A safe global club where kids create, compete, earn Kana Coins, and help other kids around the world.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.theflyingbus.com'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.theflyingbus.org'),
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        <link rel="stylesheet" href="/brand/tokens.css" />
+      </head>
       <body>{children}</body>
     </html>
   )

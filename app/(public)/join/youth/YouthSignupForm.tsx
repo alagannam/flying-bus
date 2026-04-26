@@ -57,9 +57,9 @@ export function YouthSignupForm() {
 
       <p style={styles.legal}>
         By joining you agree to our{' '}
-        <a href="https://theflyingbus.com/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+        <a href="https://theflyingbus.org/terms" target="_blank" rel="noopener noreferrer">Terms</a>
         {' '}and{' '}
-        <a href="https://theflyingbus.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+        <a href="https://theflyingbus.org/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
       </p>
     </form>
   )

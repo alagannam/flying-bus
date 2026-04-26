@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://theflyingbus.com'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://theflyingbus.org'
 
 export function Footer() {
   return (
