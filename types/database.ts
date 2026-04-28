@@ -142,6 +142,74 @@ export type Database = {
         }
         Relationships: []
       }
+      coin_spend_requests: {
+        Row: {
+          coins_amount: number
+          created_at: string
+          guardian_link_id: string
+          id: string
+          parent_user_id: string
+          review_note: string | null
+          reviewed_at: string | null
+          shop_item_id: string
+          status: string
+          youth_user_id: string
+        }
+        Insert: {
+          coins_amount: number
+          created_at?: string
+          guardian_link_id: string
+          id?: string
+          parent_user_id: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          shop_item_id: string
+          status?: string
+          youth_user_id: string
+        }
+        Update: {
+          coins_amount?: number
+          created_at?: string
+          guardian_link_id?: string
+          id?: string
+          parent_user_id?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          shop_item_id?: string
+          status?: string
+          youth_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coin_spend_requests_guardian_link_id_fkey"
+            columns: ["guardian_link_id"]
+            isOneToOne: false
+            referencedRelation: "guardian_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coin_spend_requests_parent_user_id_fkey"
+            columns: ["parent_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coin_spend_requests_shop_item_id_fkey"
+            columns: ["shop_item_id"]
+            isOneToOne: false
+            referencedRelation: "shop_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coin_spend_requests_youth_user_id_fkey"
+            columns: ["youth_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_reports: {
         Row: {
           created_at: string
@@ -422,6 +490,53 @@ export type Database = {
           value?: string
         }
         Relationships: []
+      }
+      shop_items: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          item_ref: string
+          name: string
+          price_coins: number
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          item_ref: string
+          name: string
+          price_coins: number
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          item_ref?: string
+          name?: string
+          price_coins?: number
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_items_item_ref_fkey"
+            columns: ["item_ref"]
+            isOneToOne: false
+            referencedRelation: "badge_definitions"
+            referencedColumns: ["slug"]
+          },
+        ]
       }
       submissions: {
         Row: {
@@ -735,6 +850,15 @@ export type Database = {
         Args: { p_points: number; p_user_id: string }
         Returns: number
       }
+      spend_coins: {
+        Args: {
+          p_amount: number
+          p_reason: Database["public"]["Enums"]["kana_reason"]
+          p_reference_id?: string
+          p_user_id: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       account_status:
@@ -758,6 +882,7 @@ export type Database = {
         | "admin_grant"
         | "admin_deduct"
         | "spend"
+        | "shop_purchase"
       notification_type:
         | "submission_published"
         | "submission_rejected"
@@ -936,6 +1061,7 @@ export const Constants = {
         "admin_grant",
         "admin_deduct",
         "spend",
+        "shop_purchase",
       ],
       notification_type: [
         "submission_published",
