@@ -12,11 +12,13 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [isRestricted, setIsRestricted] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setIsRestricted(false)
 
     startTransition(async () => {
       const supabase = createClient()
@@ -26,7 +28,12 @@ export function LoginForm() {
       })
 
       if (authError || !data.user) {
-        setError('Incorrect email or password.')
+        const msg = authError?.message?.toLowerCase() ?? ''
+        if (msg.includes('banned') || msg.includes('user_banned') || authError?.code === 'user_banned') {
+          setIsRestricted(true)
+        } else {
+          setError('Incorrect email or password.')
+        }
         return
       }
 
@@ -56,6 +63,14 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} style={styles.form} noValidate>
+      {isRestricted && (
+        <div role="alert" style={styles.restricted}>
+          Your account has been restricted.{' '}
+          <a href="/account-restricted" style={styles.restrictedLink}>
+            Learn more
+          </a>
+        </div>
+      )}
       {error && (
         <div role="alert" style={styles.error}>
           {error}
@@ -99,6 +114,18 @@ export function LoginForm() {
 
 const styles = {
   form: { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-4)' },
+  restricted: {
+    background: 'var(--color-warning-surface)',
+    color: 'var(--color-warning)',
+    borderRadius: 'var(--radius-md)',
+    padding: `var(--space-3) var(--space-4)`,
+    fontSize: 'var(--text-sm)',
+    lineHeight: 'var(--leading-relaxed)',
+  },
+  restrictedLink: {
+    color: 'var(--color-warning)',
+    fontWeight: 'var(--font-semibold)',
+  },
   error: {
     background: 'var(--color-error-surface)',
     color: 'var(--color-error)',

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { ReportButton } from './ReportButton'
 
 function formatDate(iso: string | null) {
   if (!iso) return null
@@ -53,8 +54,9 @@ export default async function PublicSubmissionPage({
   if (!rawSub) notFound()
   const sub = rawSub as SubRow
 
-  // Fetch author and club in parallel
-  const [profileResult, clubResult] = await Promise.all([
+  // Fetch author, club, and viewer session in parallel.
+  // getUser() is safe on the anon client — returns null if not signed in.
+  const [profileResult, clubResult, { data: { user } }] = await Promise.all([
     supabase
       .from('youth_profiles')
       .select('display_name, username')
@@ -63,7 +65,12 @@ export default async function PublicSubmissionPage({
     sub.club_id
       ? supabase.from('clubs').select('name, slug').eq('id', sub.club_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase.auth.getUser(),
   ])
+
+  // Viewer can report if signed in and is not the author.
+  // The server action re-verifies both conditions independently.
+  const viewerCanReport = !!user && user.id !== sub.youth_user_id
 
   type ProfileRow = { display_name: string; username: string }
   type ClubRow    = { name: string; slug: string }
@@ -119,6 +126,13 @@ export default async function PublicSubmissionPage({
             <p key={i} style={styles.para}>{para}</p>
           ))}
         </article>
+
+        {/* ── Report ────────────────────────────────────────── */}
+        {viewerCanReport && (
+          <div style={styles.reportSection}>
+            <ReportButton submissionId={sub.id} />
+          </div>
+        )}
 
       </div>
     </div>
@@ -185,5 +199,9 @@ const styles = {
     lineHeight: 'var(--leading-relaxed)',
     color: 'var(--color-text)',
     margin: 0,
+  },
+  reportSection: {
+    paddingTop: 'var(--space-6)',
+    borderTop: '1px solid var(--color-border)',
   },
 } as const

@@ -1,4 +1,4 @@
-@import '../public/brand/tokens.css';
+@import url('/brand/tokens.css');
 
 *,
 *::before,
