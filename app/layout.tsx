@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     template: '%s | The Flying Bus',
   },
   description: 'A safe global club where kids create, compete, earn Kana Coins, and help other kids around the world.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.theflyingbus.org'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

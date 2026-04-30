@@ -100,6 +100,7 @@ export async function parentApprove(submissionId: string): Promise<ActionResult>
 }
 
 // ── parentReject ──────────────────────────────────────────────
+
 // Sets the submission to rejected (not pending_review) and sends
 // the parent's note to the youth as feedback.
 
@@ -161,4 +162,116 @@ export async function parentReject(
   })
 
   redirect('/parent/approvals')
+}
+
+// ── approveSpend ──────────────────────────────────────────────
+// Approves a pending coin_spend_request and deducts coins from
+// the youth. The status update uses an optimistic lock on
+// status='pending' — whichever concurrent call wins that UPDATE
+// is the only one that proceeds to spend_coins. Any call that
+// finds 0 rows updated knows it lost the race and must not deduct.
+
+export async function approveSpend(requestId: string): Promise<ActionResult> {
+  const { userId: parentUserId } = await getParentSession()
+  const service = createServiceClient()
+
+  const { data: rawRequest } = await service
+    .from('coin_spend_requests')
+    .select('id, youth_user_id, shop_item_id, coins_amount, status, parent_user_id')
+    .eq('id', requestId)
+    .single()
+
+  const req = rawRequest as {
+    id: string
+    youth_user_id: string
+    shop_item_id: string
+    coins_amount: number
+    status: string
+    parent_user_id: string
+  } | null
+
+  if (!req) return { error: 'Request not found.' }
+  if (req.parent_user_id !== parentUserId) return { error: 'Not authorized.' }
+  if (req.status !== 'pending') return { error: 'This request has already been actioned.' }
+
+  // Claim the 'pending' slot atomically. If another session already approved
+  // or rejected, updated.length will be 0 and we stop before touching coins.
+  const { data: updated, error: updateError } = await service
+    .from('coin_spend_requests')
+    .update({
+      status:      'approved',
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', requestId)
+    .eq('status', 'pending')   // optimistic lock — double-deduction guard
+    .select('id')
+
+  if (updateError) return { error: 'Could not process approval. Please try again.' }
+  if (!updated || updated.length === 0) {
+    return { error: 'This request was already actioned by another session.' }
+  }
+
+  // Status is now 'approved'. Deduct coins atomically via spend_coins, which
+  // enforces balance >= amount at the DB level (raises P0001 if not).
+  const { error: spendError } = await service.rpc('spend_coins', {
+    p_user_id:      req.youth_user_id,
+    p_amount:       req.coins_amount,
+    p_reason:       'shop_purchase',
+    p_reference_id: req.shop_item_id,
+  })
+
+  if (spendError) {
+    // Status is already 'approved' — spend_coins failed. Most likely the
+    // youth's balance dropped because a different request was approved first.
+    // Log for manual reconciliation; surface the error to the parent.
+    console.error('[approveSpend] spend_coins failed after status claim', { requestId, spendError })
+    if (spendError.code === 'P0001' || spendError.message?.includes('insufficient_balance')) {
+      return { error: 'The youth no longer has enough coins — another request may have been approved first.' }
+    }
+    return { error: 'Coins could not be deducted. Please contact support.' }
+  }
+
+  return {}
+}
+
+// ── rejectSpend ───────────────────────────────────────────────
+// Rejects a pending coin_spend_request. No coins are moved.
+// Uses the same optimistic lock pattern as approveSpend.
+
+export async function rejectSpend(requestId: string): Promise<ActionResult> {
+  const { userId: parentUserId } = await getParentSession()
+  const service = createServiceClient()
+
+  const { data: rawRequest } = await service
+    .from('coin_spend_requests')
+    .select('id, parent_user_id, status')
+    .eq('id', requestId)
+    .single()
+
+  const req = rawRequest as {
+    id: string
+    parent_user_id: string
+    status: string
+  } | null
+
+  if (!req) return { error: 'Request not found.' }
+  if (req.parent_user_id !== parentUserId) return { error: 'Not authorized.' }
+  if (req.status !== 'pending') return { error: 'This request has already been actioned.' }
+
+  const { data: updated, error: updateError } = await service
+    .from('coin_spend_requests')
+    .update({
+      status:      'rejected',
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', requestId)
+    .eq('status', 'pending')   // optimistic lock
+    .select('id')
+
+  if (updateError) return { error: 'Could not save your decision. Please try again.' }
+  if (!updated || updated.length === 0) {
+    return { error: 'This request was already actioned by another session.' }
+  }
+
+  return {}
 }

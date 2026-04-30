@@ -1,0 +1,105 @@
+'use server'
+
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+
+export type PurchaseResult =
+  | { status: 'purchased'; newBalance: number }
+  | { status: 'pending_approval' }
+  | { status: 'insufficient_coins' }
+  | { status: 'item_unavailable' }
+  | { status: 'error'; message: string }
+
+export async function initiatePurchase(itemId: string): Promise<PurchaseResult> {
+  const supabase = await createClient()
+  const service  = createServiceClient()
+
+  // 1. Auth — must be a logged-in youth account.
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { status: 'error', message: 'Not authenticated.' }
+
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('account_type')
+    .eq('id', user.id)
+    .single()
+
+  if (!userRow || userRow.account_type !== 'youth') {
+    return { status: 'error', message: 'Youth account required.' }
+  }
+
+  // 2. Fetch item + balance in parallel — both are needed before we can proceed.
+  const [itemResult, profileResult] = await Promise.all([
+    service
+      .from('shop_items')
+      .select('id, name, price_coins')
+      .eq('id', itemId)
+      .eq('is_active', true)
+      .maybeSingle(),
+    supabase
+      .from('youth_profiles')
+      .select('coins_balance')
+      .eq('user_id', user.id)
+      .single(),
+  ])
+
+  if (!itemResult.data) return { status: 'item_unavailable' }
+
+  const item    = itemResult.data
+  const balance = profileResult.data?.coins_balance ?? 0
+
+  // 3. Pre-flight balance check (spend_coins is the atomic gate, but failing
+  //    here saves a round-trip and gives a clearer error message).
+  if (balance < item.price_coins) return { status: 'insufficient_coins' }
+
+  // 4. Guardian approval check — use service client so RLS on guardian_links
+  //    doesn't interfere. If ANY active guardian requires spending approval,
+  //    route to the approval flow (most-restrictive policy).
+  const { data: approvalLink } = await service
+    .from('guardian_links')
+    .select('id, parent_user_id')
+    .eq('child_user_id', user.id)
+    .eq('status', 'active')
+    .eq('spending_requires_approval', true)
+    .limit(1)
+    .maybeSingle()
+
+  if (approvalLink) {
+    // Create a pending spend request; coins are NOT deducted yet.
+    const { error: insertError } = await service
+      .from('coin_spend_requests')
+      .insert({
+        youth_user_id:  user.id,
+        parent_user_id: approvalLink.parent_user_id,
+        guardian_link_id: approvalLink.id,
+        shop_item_id:   item.id,
+        coins_amount:   item.price_coins,
+        status:         'pending',
+      })
+
+    if (insertError) {
+      return { status: 'error', message: 'Could not submit approval request. Please try again.' }
+    }
+
+    return { status: 'pending_approval' }
+  }
+
+  // 5. No approval required — deduct coins atomically.
+  // spend_coins raises P0001 'insufficient_balance' if the balance has dropped
+  // since our pre-flight check (race condition guard).
+  const { data: newBalance, error: spendError } = await service
+    .rpc('spend_coins', {
+      p_user_id:      user.id,
+      p_amount:       item.price_coins,
+      p_reason:       'shop_purchase',
+      p_reference_id: item.id,
+    })
+
+  if (spendError) {
+    if (spendError.code === 'P0001' || spendError.message?.includes('insufficient_balance')) {
+      return { status: 'insufficient_coins' }
+    }
+    return { status: 'error', message: 'Purchase failed. Please try again.' }
+  }
+
+  return { status: 'purchased', newBalance: newBalance as number }
+}

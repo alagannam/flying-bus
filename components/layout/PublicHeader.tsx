@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.theflyingbus.org'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
 const NAV_LINKS = [
   { label: 'Clubs',        href: '/clubs' },
@@ -13,7 +13,7 @@ export function PublicHeader() {
   return (
     <header style={styles.header}>
       <div style={styles.inner}>
-        <Link href={process.env.NEXT_PUBLIC_SITE_URL ?? 'https://theflyingbus.org'} style={styles.logo}>
+        <Link href={process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'} style={styles.logo}>
           <span style={styles.logoText}>The Flying Bus</span>
         </Link>
 
