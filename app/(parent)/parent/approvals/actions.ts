@@ -231,6 +231,35 @@ export async function approveSpend(requestId: string): Promise<ActionResult> {
     return { error: 'Coins could not be deducted. Please contact support.' }
   }
 
+  // Coins deducted — now grant the badge referenced by the shop item.
+  // Fetch item_ref here (after the status lock and spend) so early exits
+  // above are never charged a pointless DB call.
+  const { data: itemRow } = await service
+    .from('shop_items')
+    .select('item_ref')
+    .eq('id', req.shop_item_id)
+    .single()
+
+  if (itemRow?.item_ref) {
+    const { error: badgeError } = await service
+      .from('youth_badges')
+      .upsert(
+        { user_id: req.youth_user_id, badge_slug: itemRow.item_ref },
+        { onConflict: 'user_id,badge_slug', ignoreDuplicates: true },
+      )
+
+    if (badgeError) {
+      // Coins are already deducted and request is marked approved.
+      // Do not refund or surface to parent — log for manual reconciliation.
+      console.error('[approveSpend] badge grant failed after coins deducted', {
+        requestId,
+        shopItemId: req.shop_item_id,
+        badgeSlug:  itemRow.item_ref,
+        badgeError,
+      })
+    }
+  }
+
   return {}
 }
 

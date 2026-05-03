@@ -31,6 +31,9 @@ export function PurchaseButton({ itemId, price, userBalance }: Props) {
         <span style={styles.statusIcon}>✓</span>
         <div>
           <p style={styles.statusTitle}>Purchased!</p>
+          {result.badgeName && (
+            <p style={styles.statusSub}>{result.badgeName} granted</p>
+          )}
           <p style={styles.statusSub}>
             New balance: {result.newBalance.toLocaleString()} coins
           </p>

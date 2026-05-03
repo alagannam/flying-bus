@@ -3,7 +3,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export type PurchaseResult =
-  | { status: 'purchased'; newBalance: number }
+  | { status: 'purchased'; newBalance: number; badgeName?: string }
   | { status: 'pending_approval' }
   | { status: 'insufficient_coins' }
   | { status: 'item_unavailable' }
@@ -31,7 +31,7 @@ export async function initiatePurchase(itemId: string): Promise<PurchaseResult> 
   const [itemResult, profileResult] = await Promise.all([
     service
       .from('shop_items')
-      .select('id, name, price_coins')
+      .select('id, name, price_coins, item_ref')
       .eq('id', itemId)
       .eq('is_active', true)
       .maybeSingle(),
@@ -101,5 +101,25 @@ export async function initiatePurchase(itemId: string): Promise<PurchaseResult> 
     return { status: 'error', message: 'Purchase failed. Please try again.' }
   }
 
-  return { status: 'purchased', newBalance: newBalance as number }
+  // 6. Grant the badge referenced by item_ref. Upsert with ignoreDuplicates
+  //    so re-purchasing an already-owned badge succeeds silently instead of
+  //    throwing a unique-constraint error.
+  const { error: badgeError } = await service
+    .from('youth_badges')
+    .upsert(
+      { user_id: user.id, badge_slug: item.item_ref },
+      { onConflict: 'user_id,badge_slug', ignoreDuplicates: true },
+    )
+
+  if (badgeError) {
+    // Coins were legitimately deducted — do not refund. Log for reconciliation.
+    console.error('[initiatePurchase] badge grant failed after coins deducted', {
+      userId:    user.id,
+      itemId:    item.id,
+      badgeSlug: item.item_ref,
+      badgeError,
+    })
+  }
+
+  return { status: 'purchased', newBalance: newBalance as number, badgeName: item.name }
 }
