@@ -1,12 +1,8 @@
 select
-  title,
-  type,
-  read_at
-from public.notifications
-where user_id = (
-  select user_id
-  from public.youth_profiles
-  where username = 'test12'
-)
-order by created_at desc
-limit 10;
+  a.email,
+  u.account_type,
+  u.account_status
+from public.users u
+join auth.users a
+  on a.id = u.id
+where a.email = 'parent1@test.com';

@@ -85,7 +85,7 @@ export default async function ReviewDetailPage(
     <div style={styles.page}>
       <div style={styles.container}>
 
-        <Link href="/admin/review-queue" style={styles.back}>
+        <Link href="/admin/submissions" style={styles.back}>
           ← Review Queue
         </Link>
 
@@ -152,7 +152,7 @@ export default async function ReviewDetailPage(
 
         {/* ── Return link if already done ───────────────── */}
         {!isPending && (
-          <Link href="/admin/review-queue" style={styles.returnLink}>
+          <Link href="/admin/submissions" style={styles.returnLink}>
             ← Back to queue
           </Link>
         )}

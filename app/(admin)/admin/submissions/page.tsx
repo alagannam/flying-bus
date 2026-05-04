@@ -83,7 +83,7 @@ export default async function ReviewQueuePage() {
         <ul style={styles.list}>
           {submissions.map(s => (
             <li key={s.id}>
-              <a href={`/admin/review-queue/${s.id}`} style={styles.card}>
+              <a href={`/admin/submissions/${s.id}`} style={styles.card}>
                 <div style={styles.cardMain}>
                   <span style={styles.cardTitle}>{s.title}</span>
                   <div style={styles.cardMeta}>

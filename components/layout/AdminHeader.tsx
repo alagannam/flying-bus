@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { AccountType } from '@/types/app'
 
 const ALL_NAV_LINKS = [
-  { label: 'Review Queue',  href: '/admin/review-queue',  roles: ['editor', 'admin'] },
+  { label: 'Submissions',   href: '/admin/submissions',   roles: ['editor', 'admin'] },
   { label: 'Featured',      href: '/admin/featured',      roles: ['editor', 'admin'] },
   { label: 'Challenges',    href: '/admin/challenges',    roles: ['editor', 'admin'] },
   { label: 'Clubs',         href: '/admin/clubs',         roles: ['editor', 'admin'] },

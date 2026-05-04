@@ -152,7 +152,7 @@ export async function approveSubmission(
     reference_id: id,
   })
 
-  redirect('/admin/review-queue')
+  redirect('/admin/submissions')
 }
 
 // ── rejectSubmission ──────────────────────────────────────────
@@ -216,5 +216,5 @@ export async function rejectSubmission(
     reference_id: id,
   })
 
-  redirect('/admin/review-queue')
+  redirect('/admin/submissions')
 }
