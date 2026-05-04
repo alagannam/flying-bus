@@ -77,20 +77,31 @@ export async function initiatePurchase(itemId: string): Promise<PurchaseResult> 
 
   if (approvalLink) {
     // Create a pending spend request; coins are NOT deducted yet.
-    const { error: insertError } = await service
+    const { data: spendRequest, error: insertError } = await service
       .from('coin_spend_requests')
       .insert({
-        youth_user_id:  user.id,
-        parent_user_id: approvalLink.parent_user_id,
+        youth_user_id:    user.id,
+        parent_user_id:   approvalLink.parent_user_id,
         guardian_link_id: approvalLink.id,
-        shop_item_id:   item.id,
-        coins_amount:   item.price_coins,
-        status:         'pending',
+        shop_item_id:     item.id,
+        coins_amount:     item.price_coins,
+        status:           'pending',
       })
+      .select('id')
+      .single()
 
-    if (insertError) {
+    if (insertError || !spendRequest) {
       return { status: 'error', message: 'Could not submit approval request. Please try again.' }
     }
+
+    // Notify the parent — best-effort, does not block the pending_approval response.
+    await service.from('notifications').insert({
+      user_id:      approvalLink.parent_user_id,
+      type:         'parent_approval_needed',
+      title:        'Approval needed for a coin purchase',
+      body:         `Your child wants to spend ${item.price_coins} Kana Coins on "${item.name}". Visit Approvals to review.`,
+      reference_id: spendRequest.id,
+    })
 
     return { status: 'pending_approval' }
   }

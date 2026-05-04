@@ -7,7 +7,7 @@ const NAV_LINKS = [
   { label: 'Settings',    href: '/parent/settings' },
 ]
 
-export function ParentHeader({ displayName }: { displayName: string }) {
+export function ParentHeader({ displayName, unreadCount }: { displayName: string; unreadCount: number }) {
   return (
     <header style={styles.header}>
       <div style={styles.inner}>
@@ -25,6 +25,18 @@ export function ParentHeader({ displayName }: { displayName: string }) {
         </nav>
 
         <div style={styles.right}>
+          <Link
+            href="/parent/notifications"
+            style={styles.notifButton}
+            aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
+          >
+            🔔
+            {unreadCount > 0 && (
+              <span style={styles.notifBadge} aria-hidden="true">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Link>
           <span style={styles.displayName}>{displayName}</span>
         </div>
       </div>
@@ -78,7 +90,42 @@ const styles = {
     color: 'var(--color-text-secondary)',
     textDecoration: 'none',
   },
-  right: { flexShrink: 0 },
+  right: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'var(--space-3)',
+  },
+  notifButton: {
+    position: 'relative' as const,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 'var(--radius-full)',
+    background: 'var(--color-surface-raised)',
+    border: '1px solid var(--color-border)',
+    textDecoration: 'none',
+    fontSize: 'var(--text-base)',
+  },
+  notifBadge: {
+    position: 'absolute' as const,
+    top: 0,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 'var(--radius-full)',
+    background: 'var(--color-error)',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'var(--font-bold)' as const,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingInline: 3,
+    lineHeight: 1,
+  },
   displayName: {
     fontSize: 'var(--text-sm)',
     fontWeight: 'var(--font-medium)',

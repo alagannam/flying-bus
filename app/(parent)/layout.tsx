@@ -12,19 +12,28 @@ export default async function ParentLayout({ children }: { children: React.React
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: rawParentProfile } = await supabase
-    .from('parent_profiles')
-    .select('display_name')
-    .eq('user_id', user.id)
-    .single()
+  const [profileResult, unreadResult] = await Promise.all([
+    supabase
+      .from('parent_profiles')
+      .select('display_name')
+      .eq('user_id', user.id)
+      .single(),
+    supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .is('read_at', null),
+  ])
 
-  const parentProfile = rawParentProfile as { display_name: string } | null
+  const parentProfile = profileResult.data as { display_name: string } | null
 
   if (!parentProfile) redirect('/login')
 
+  const unreadCount = unreadResult.count ?? 0
+
   return (
     <>
-      <ParentHeader displayName={parentProfile.display_name} />
+      <ParentHeader displayName={parentProfile.display_name} unreadCount={unreadCount} />
       <main>{children}</main>
       <Footer />
     </>

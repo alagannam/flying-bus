@@ -1,10 +1,13 @@
 select
-  yb.badge_slug,
-  yb.awarded_at
-from public.youth_badges yb
-where yb.user_id = (
-  select user_id
-  from public.youth_profiles
-  where username = 'test13'
+  type,
+  title,
+  body,
+  read_at
+from public.notifications
+where user_id = (
+  select id
+  from auth.users
+  where email = 'parent1@test.com'
 )
-order by yb.awarded_at desc;
+order by created_at desc
+limit 5;
