@@ -137,9 +137,9 @@ export default async function MyProfilePage() {
         </div>
 
         {/* ── Badges ─────────────────────────────────────────── */}
-        {badges.length > 0 && (
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Badges</h2>
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Badges</h2>
+          {badges.length > 0 ? (
             <div style={styles.badgeGrid}>
               {badges.map(b => (
                 <div key={b.badge_slug} style={styles.badgeCard}>
@@ -157,8 +157,18 @@ export default async function MyProfilePage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div style={styles.empty}>
+              <p style={styles.emptyText}>
+                No badges yet —{' '}
+                <Link href="/shop" style={styles.emptyShopLink}>
+                  visit the shop
+                </Link>
+                {' '}to earn your first
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* ── Published work ─────────────────────────────────── */}
         <div style={styles.section}>
@@ -369,6 +379,11 @@ const styles = {
   emptyText: {
     fontSize: 'var(--text-sm)',
     color: 'var(--color-text-muted)',
+  },
+  emptyShopLink: {
+    color: 'var(--color-primary)',
+    fontWeight: 'var(--font-medium)',
+    textDecoration: 'none',
   },
   subList: {
     listStyle: 'none',
