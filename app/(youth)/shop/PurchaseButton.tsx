@@ -8,13 +8,22 @@ type Props = {
   itemId:      string
   price:       number
   userBalance: number
+  isOwned?:    boolean
 }
 
-export function PurchaseButton({ itemId, price, userBalance }: Props) {
+export function PurchaseButton({ itemId, price, userBalance, isOwned }: Props) {
   const [result, setResult]     = useState<PurchaseResult | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const canAfford = userBalance >= price
+
+  if (isOwned) {
+    return (
+      <div style={styles.ownedBadge}>
+        <span>Already owned</span>
+      </div>
+    )
+  }
 
   function handlePurchase() {
     startTransition(async () => {
@@ -66,6 +75,9 @@ export function PurchaseButton({ itemId, price, userBalance }: Props) {
       {result?.status === 'item_unavailable' && (
         <p role="alert" style={styles.errorMsg}>Item is no longer available.</p>
       )}
+      {result?.status === 'already_owned' && (
+        <p role="alert" style={styles.errorMsg}>You already own this badge.</p>
+      )}
       {result?.status === 'error' && (
         <p role="alert" style={styles.errorMsg}>{result.message}</p>
       )}
@@ -90,6 +102,20 @@ export function PurchaseButton({ itemId, price, userBalance }: Props) {
 }
 
 const styles = {
+  ownedBadge: {
+    display:        'inline-flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    height:         40,
+    borderRadius:   'var(--radius-full)',
+    border:         '1px solid var(--color-border)',
+    background:     'var(--color-surface-alt)',
+    color:          'var(--color-text-muted)',
+    fontWeight:     'var(--font-semibold)',
+    fontSize:       'var(--text-sm)',
+    padding:        '0 var(--space-5)',
+    width:          '100%',
+  },
   wrapper: {
     display:        'flex',
     flexDirection:  'column' as const,

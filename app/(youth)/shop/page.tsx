@@ -11,6 +11,7 @@ type ShopItem = {
   description: string | null
   price_coins: number
   category:    string
+  item_ref:    string
 }
 
 export default async function ShopPage() {
@@ -20,10 +21,8 @@ export default async function ShopPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch balance and active shop items in parallel.
-  // Items are fetched via service client so `is_active` filtering is reliable
-  // regardless of any RLS nuance; authenticated RLS also allows this read.
-  const [profileResult, itemsResult] = await Promise.all([
+  // Fetch balance, active shop items, and owned badges in parallel.
+  const [profileResult, itemsResult, badgesResult] = await Promise.all([
     supabase
       .from('youth_profiles')
       .select('coins_balance')
@@ -31,13 +30,20 @@ export default async function ShopPage() {
       .single(),
     service
       .from('shop_items')
-      .select('id, name, description, price_coins, category')
+      .select('id, name, description, price_coins, category, item_ref')
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
+    supabase
+      .from('youth_badges')
+      .select('badge_slug')
+      .eq('user_id', user.id),
   ])
 
-  const balance = profileResult.data?.coins_balance ?? 0
-  const items   = (itemsResult.data ?? []) as ShopItem[]
+  const balance    = profileResult.data?.coins_balance ?? 0
+  const items      = (itemsResult.data ?? []) as ShopItem[]
+  const ownedSlugs = new Set(
+    (badgesResult.data ?? []).map((b: { badge_slug: string }) => b.badge_slug)
+  )
 
   return (
     <div style={styles.page}>
@@ -92,6 +98,7 @@ export default async function ShopPage() {
                   itemId={item.id}
                   price={item.price_coins}
                   userBalance={balance}
+                  isOwned={ownedSlugs.has(item.item_ref)}
                 />
 
               </li>

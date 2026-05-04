@@ -5,6 +5,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 export type PurchaseResult =
   | { status: 'purchased'; newBalance: number; badgeName?: string }
   | { status: 'pending_approval' }
+  | { status: 'already_owned' }
   | { status: 'insufficient_coins' }
   | { status: 'item_unavailable' }
   | { status: 'error'; message: string }
@@ -47,11 +48,22 @@ export async function initiatePurchase(itemId: string): Promise<PurchaseResult> 
   const item    = itemResult.data
   const balance = profileResult.data?.coins_balance ?? 0
 
-  // 3. Pre-flight balance check (spend_coins is the atomic gate, but failing
+  // 3. Ownership check — if the youth already owns the badge this item grants,
+  //    skip the entire purchase flow (no coins moved, no approval request).
+  const { data: existingBadge } = await service
+    .from('youth_badges')
+    .select('badge_slug')
+    .eq('user_id', user.id)
+    .eq('badge_slug', item.item_ref)
+    .maybeSingle()
+
+  if (existingBadge) return { status: 'already_owned' }
+
+  // 4. Pre-flight balance check (spend_coins is the atomic gate, but failing
   //    here saves a round-trip and gives a clearer error message).
   if (balance < item.price_coins) return { status: 'insufficient_coins' }
 
-  // 4. Guardian approval check — use service client so RLS on guardian_links
+  // 5. Guardian approval check — use service client so RLS on guardian_links
   //    doesn't interfere. If ANY active guardian requires spending approval,
   //    route to the approval flow (most-restrictive policy).
   const { data: approvalLink } = await service
@@ -83,7 +95,7 @@ export async function initiatePurchase(itemId: string): Promise<PurchaseResult> 
     return { status: 'pending_approval' }
   }
 
-  // 5. No approval required — deduct coins atomically.
+  // 6. No approval required — deduct coins atomically.
   // spend_coins raises P0001 'insufficient_balance' if the balance has dropped
   // since our pre-flight check (race condition guard).
   const { data: newBalance, error: spendError } = await service
@@ -101,7 +113,7 @@ export async function initiatePurchase(itemId: string): Promise<PurchaseResult> 
     return { status: 'error', message: 'Purchase failed. Please try again.' }
   }
 
-  // 6. Grant the badge referenced by item_ref. Upsert with ignoreDuplicates
+  // 7. Grant the badge referenced by item_ref. Upsert with ignoreDuplicates
   //    so re-purchasing an already-owned badge succeeds silently instead of
   //    throwing a unique-constraint error.
   const { error: badgeError } = await service
