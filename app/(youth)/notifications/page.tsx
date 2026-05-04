@@ -1,9 +1,13 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { markRead } from './actions'
+import { MarkAllRead } from './MarkAllRead'
 
 export const metadata: Metadata = { title: 'Notifications' }
+
+// Never serve a cached RSC payload for this page — user-scoped data must
+// always be fetched fresh so switching accounts doesn't show stale content.
+export const dynamic = 'force-dynamic'
 
 type NotificationType =
   | 'submission_published'
@@ -61,11 +65,13 @@ export default async function NotificationsPage() {
     .select('id, type, title, body, read_at, reference_id, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+    .limit(50)
 
   const notifications = (rawRows ?? []) as Notification[]
 
-  const unread = notifications.filter(n => !n.read_at)
-  const read   = notifications.filter(n => !!n.read_at)
+  const unread    = notifications.filter(n => !n.read_at)
+  const read      = notifications.filter(n => !!n.read_at)
+  const unreadIds = unread.map(n => n.id)
 
   return (
     <div style={styles.page}>
@@ -114,14 +120,16 @@ export default async function NotificationsPage() {
         )}
 
       </div>
+
+      {/* Fires once on mount — marks all unread rows as read in the background */}
+      <MarkAllRead ids={unreadIds} />
     </div>
   )
 }
 
 function NotificationItem({ n, muted = false }: { n: Notification; muted?: boolean }) {
-  const typeKey  = (n.type in TYPE_LABELS ? n.type : 'general') as NotificationType
-  const badge    = TYPE_COLORS[typeKey]
-  const markAction = markRead.bind(null, n.id)
+  const typeKey = (n.type in TYPE_LABELS ? n.type : 'general') as NotificationType
+  const badge   = TYPE_COLORS[typeKey]
 
   return (
     <li style={{ ...styles.item, background: muted ? 'var(--color-surface-raised)' : 'var(--color-surface)' }}>
@@ -141,11 +149,6 @@ function NotificationItem({ n, muted = false }: { n: Notification; muted?: boole
           </a>
         )}
       </div>
-      {!muted && (
-        <form action={markAction} style={styles.markForm}>
-          <button type="submit" style={styles.markBtn}>Mark as read</button>
-        </form>
-      )}
     </li>
   )
 }
@@ -270,16 +273,5 @@ const styles = {
     fontSize: 'var(--text-xs)',
     color: 'var(--color-primary)',
     fontWeight: 'var(--font-medium)',
-  },
-  markForm: { flexShrink: 0 },
-  markBtn: {
-    background: 'none',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--color-text-muted)',
-    fontSize: 'var(--text-xs)',
-    padding: 'var(--space-1) var(--space-2)',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap' as const,
   },
 } as const

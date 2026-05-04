@@ -8,6 +8,7 @@ interface YouthHeaderProps {
     coins_balance: number
     creator_level: number
   }
+  unreadCount: number
 }
 
 const NAV_LINKS = [
@@ -19,7 +20,7 @@ const NAV_LINKS = [
   { label: 'Impact',       href: '/impact' },
 ]
 
-export function YouthHeader({ profile }: YouthHeaderProps) {
+export function YouthHeader({ profile, unreadCount }: YouthHeaderProps) {
   return (
     <header style={styles.header}>
       <div style={styles.inner}>
@@ -41,8 +42,17 @@ export function YouthHeader({ profile }: YouthHeaderProps) {
             <span style={styles.coinsCount}>{profile.coins_balance.toLocaleString()}</span>
           </Link>
 
-          <Link href="/notifications" style={styles.iconButton} aria-label="Notifications">
+          <Link
+            href="/notifications"
+            style={styles.iconButton}
+            aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+          >
             🔔
+            {unreadCount > 0 && (
+              <span style={styles.notifBadge} aria-hidden="true">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </Link>
 
           <Link href="/profile" style={styles.avatar} title={profile.display_name}>
@@ -131,6 +141,7 @@ const styles = {
     color: 'var(--color-text)',
   },
   iconButton: {
+    position: 'relative' as const,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -139,6 +150,22 @@ const styles = {
     borderRadius: 'var(--radius-full)',
     textDecoration: 'none',
     fontSize: 16,
+  },
+  notifBadge: {
+    position: 'absolute' as const,
+    top: 0,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    padding: '0 3px',
+    background: 'var(--color-error)',
+    color: '#fff',
+    borderRadius: 'var(--radius-full)',
+    fontSize: 10,
+    fontWeight: 'var(--font-bold)' as const,
+    lineHeight: '16px',
+    textAlign: 'center' as const,
+    pointerEvents: 'none',
   },
   avatar: {
     display: 'flex',

@@ -22,3 +22,24 @@ export async function markRead(id: string): Promise<void> {
 
   revalidatePath('/notifications')
 }
+
+// Bulk mark-read for all visible unread notifications on page visit.
+// Called from the MarkAllRead client component immediately after mount.
+// The .is('read_at', null) guard makes this idempotent — re-runs are safe.
+export async function markAllRead(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .in('id', ids)
+    .eq('user_id', user.id)  // ownership — defence beyond RLS
+    .is('read_at', null)
+
+  revalidatePath('/notifications')
+}
