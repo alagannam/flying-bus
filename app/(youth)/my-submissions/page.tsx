@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'My Submissions' }
 
 type SubmissionStatus =
@@ -12,19 +14,19 @@ type SubmissionStatus =
   | 'rejected'
 
 const STATUS_LABELS: Record<SubmissionStatus, string> = {
-  draft:                    'Draft',
-  pending_parent_approval:  'Awaiting parent',
-  pending_review:           'In review',
-  published:                'Published',
-  rejected:                 'Not approved',
+  draft:                   'Draft',
+  pending_parent_approval: 'Awaiting parent',
+  pending_review:          'In review',
+  published:               'Published',
+  rejected:                'Not approved',
 }
 
 const STATUS_COLORS: Record<SubmissionStatus, { bg: string; color: string }> = {
-  draft:                    { bg: 'var(--color-surface-raised)',   color: 'var(--color-text-secondary)' },
-  pending_parent_approval:  { bg: 'var(--color-warning-surface)',  color: 'var(--color-warning)' },
-  pending_review:           { bg: 'var(--color-warning-surface)',  color: 'var(--color-warning)' },
-  published:                { bg: 'var(--color-success-surface)',  color: 'var(--color-success)' },
-  rejected:                 { bg: 'var(--color-error-surface)',    color: 'var(--color-error)' },
+  draft:                   { bg: 'var(--color-surface-raised)',  color: 'var(--color-text-secondary)' },
+  pending_parent_approval: { bg: 'var(--color-warning-surface)', color: 'var(--color-warning)' },
+  pending_review:          { bg: 'var(--color-warning-surface)', color: 'var(--color-warning)' },
+  published:               { bg: 'var(--color-success-surface)', color: 'var(--color-success)' },
+  rejected:                { bg: 'var(--color-error-surface)',   color: 'var(--color-error)' },
 }
 
 function formatDate(iso: string | null) {
@@ -40,8 +42,8 @@ function dateLabel(s: {
   submitted_at: string | null
   published_at: string | null
 }) {
-  if (s.published_at)  return `Published ${formatDate(s.published_at)}`
-  if (s.submitted_at)  return `Submitted ${formatDate(s.submitted_at)}`
+  if (s.published_at) return `Published ${formatDate(s.published_at)}`
+  if (s.submitted_at) return `Submitted ${formatDate(s.submitted_at)}`
   return `Saved ${formatDate(s.created_at)}`
 }
 
@@ -56,6 +58,7 @@ export default async function MySubmissionsPage() {
     .select('id, title, status, created_at, submitted_at, published_at')
     .eq('youth_user_id', user.id)
     .order('created_at', { ascending: false })
+    .limit(50)
 
   const submissions = (rawRows ?? []) as {
     id: string
@@ -72,29 +75,43 @@ export default async function MySubmissionsPage() {
 
         <div style={styles.top}>
           <h1 style={styles.heading}>My Submissions</h1>
-          <a href="/studio/new" style={styles.newBtn}>+ New submission</a>
+          <Link href="/studio/new" style={styles.newBtn}>+ New submission</Link>
         </div>
 
         {submissions.length === 0 ? (
           <div style={styles.empty}>
             <p style={styles.emptyText}>You haven&apos;t submitted anything yet.</p>
-            <a href="/studio/new" style={styles.emptyLink}>Create your first submission →</a>
+            <Link href="/studio/new" style={styles.emptyLink}>
+              Create your first submission →
+            </Link>
           </div>
         ) : (
           <ul style={styles.list}>
             {submissions.map(s => {
               const badge = STATUS_COLORS[s.status]
+              const inner = (
+                <>
+                  <div style={styles.cardLeft}>
+                    <span style={styles.cardTitle}>{s.title}</span>
+                    <span style={styles.cardDate}>{dateLabel(s)}</span>
+                  </div>
+                  <span style={{ ...styles.badge, background: badge.bg, color: badge.color }}>
+                    {STATUS_LABELS[s.status]}
+                  </span>
+                </>
+              )
+
               return (
                 <li key={s.id}>
-                  <a href={`/my-submissions/${s.id}`} style={styles.card}>
-                    <div style={styles.cardLeft}>
-                      <span style={styles.cardTitle}>{s.title}</span>
-                      <span style={styles.cardDate}>{dateLabel(s)}</span>
+                  {s.status === 'published' ? (
+                    <Link href={`/submissions/${s.id}`} style={styles.card}>
+                      {inner}
+                    </Link>
+                  ) : (
+                    <div style={styles.cardStatic}>
+                      {inner}
                     </div>
-                    <span style={{ ...styles.badge, background: badge.bg, color: badge.color }}>
-                      {STATUS_LABELS[s.status]}
-                    </span>
-                  </a>
+                  )}
                 </li>
               )
             })}
@@ -105,6 +122,17 @@ export default async function MySubmissionsPage() {
     </div>
   )
 }
+
+const cardBase = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 'var(--space-4)',
+  background: 'var(--color-surface)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--color-border)',
+  padding: 'var(--space-4) var(--space-5)',
+} as const
 
 const styles = {
   page: {
@@ -148,15 +176,20 @@ const styles = {
     background: 'var(--color-surface)',
     borderRadius: 'var(--radius-xl)',
     border: '1px dashed var(--color-border)',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 'var(--space-3)',
+    alignItems: 'center',
   },
   emptyText: {
+    fontSize: 'var(--text-base)',
     color: 'var(--color-text-secondary)',
-    marginBottom: 'var(--space-3)',
   },
   emptyLink: {
-    color: 'var(--color-primary)',
-    fontWeight: 'var(--font-medium)',
     fontSize: 'var(--text-sm)',
+    fontWeight: 'var(--font-medium)',
+    color: 'var(--color-primary)',
+    textDecoration: 'none',
   },
   list: {
     listStyle: 'none',
@@ -167,15 +200,11 @@ const styles = {
     gap: 'var(--space-2)',
   },
   card: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 'var(--space-4)',
-    background: 'var(--color-surface)',
-    borderRadius: 'var(--radius-lg)',
-    border: '1px solid var(--color-border)',
-    padding: 'var(--space-4) var(--space-5)',
+    ...cardBase,
     textDecoration: 'none',
+  },
+  cardStatic: {
+    ...cardBase,
   },
   cardLeft: {
     display: 'flex',

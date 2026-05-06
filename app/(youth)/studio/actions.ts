@@ -132,7 +132,7 @@ export async function createAndSubmit(formData: FormData): Promise<ActionResult>
     })
   }
 
-  redirect(`/my-submissions/${submission.id}`)
+  redirect('/my-submissions')
 }
 
 // ── deleteDraft ───────────────────────────────────────────────
