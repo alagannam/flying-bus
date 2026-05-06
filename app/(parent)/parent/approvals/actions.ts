@@ -232,11 +232,11 @@ export async function approveSpend(requestId: string): Promise<ActionResult> {
   }
 
   // Coins deducted — now grant the badge referenced by the shop item.
-  // Fetch item_ref here (after the status lock and spend) so early exits
-  // above are never charged a pointless DB call.
+  // Fetch item_ref and name here (after the status lock and spend) so early
+  // exits above are never charged a pointless DB call.
   const { data: itemRow } = await service
     .from('shop_items')
-    .select('item_ref')
+    .select('item_ref, name')
     .eq('id', req.shop_item_id)
     .single()
 
@@ -260,6 +260,15 @@ export async function approveSpend(requestId: string): Promise<ActionResult> {
     }
   }
 
+  // Notify youth — best-effort, does not affect the ActionResult.
+  await service.from('notifications').insert({
+    user_id:      req.youth_user_id,
+    type:         'parent_approved',
+    title:        'Your parent approved your purchase',
+    body:         `"${itemRow?.name ?? 'Your item'}" is now in your profile. ${req.coins_amount.toLocaleString()} Kana Coins were deducted.`,
+    reference_id: req.id,
+  })
+
   return {}
 }
 
@@ -273,13 +282,15 @@ export async function rejectSpend(requestId: string): Promise<ActionResult> {
 
   const { data: rawRequest } = await service
     .from('coin_spend_requests')
-    .select('id, parent_user_id, status')
+    .select('id, parent_user_id, youth_user_id, shop_item_id, status')
     .eq('id', requestId)
     .single()
 
   const req = rawRequest as {
     id: string
     parent_user_id: string
+    youth_user_id: string
+    shop_item_id: string
     status: string
   } | null
 
@@ -301,6 +312,21 @@ export async function rejectSpend(requestId: string): Promise<ActionResult> {
   if (!updated || updated.length === 0) {
     return { error: 'This request was already actioned by another session.' }
   }
+
+  // Notify youth — fetch item name for the body, best-effort.
+  const { data: itemRow } = await service
+    .from('shop_items')
+    .select('name')
+    .eq('id', req.shop_item_id)
+    .maybeSingle()
+
+  await service.from('notifications').insert({
+    user_id:      req.youth_user_id,
+    type:         'parent_rejected',
+    title:        'Your parent declined a purchase request',
+    body:         `Your request for "${itemRow?.name ?? 'an item'}" was not approved.`,
+    reference_id: req.id,
+  })
 
   return {}
 }

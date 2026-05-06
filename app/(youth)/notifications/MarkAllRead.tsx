@@ -5,8 +5,10 @@ import { markAllRead } from './actions'
 
 export function MarkAllRead({ ids }: { ids: string[] }) {
   useEffect(() => {
-    if (ids.length > 0) markAllRead(ids)
-  }, []) // intentionally empty — fire once on mount only
+    if (!ids.length) return
+
+    void markAllRead(ids)
+  }, [ids])
 
   return null
 }
