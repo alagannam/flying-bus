@@ -102,8 +102,8 @@ export function EditProfileForm({ currentDisplayName, currentBio, username }: Pr
       <div style={styles.actions}>
         <button
           type="submit"
-          disabled={isPending}
-          style={isPending
+          disabled={isPending || displayName.trim().length < 2}
+          style={isPending || displayName.trim().length < 2
             ? { ...styles.saveBtn, opacity: 0.6, cursor: 'not-allowed' }
             : styles.saveBtn
           }
