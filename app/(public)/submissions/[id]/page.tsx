@@ -11,10 +11,17 @@ function formatDate(iso: string | null) {
   })
 }
 
+const AGE_BAND_LABELS: Record<string, string> = {
+  '8-10':  'Ages 8–10',
+  '11-13': 'Ages 11–13',
+  '14-18': 'Ages 14–18',
+}
+
 type SubRow = {
   id: string
   title: string
   body: string
+  age_band: string
   youth_user_id: string
   club_id: string | null
   published_at: string | null
@@ -46,7 +53,7 @@ export default async function PublicSubmissionPage({
   // Only published submissions are visible publicly
   const { data: rawSub } = await supabase
     .from('submissions')
-    .select('id, title, body, youth_user_id, club_id, published_at')
+    .select('id, title, body, age_band, youth_user_id, club_id, published_at')
     .eq('id', id)
     .eq('status', 'published')
     .maybeSingle()
@@ -111,6 +118,8 @@ export default async function PublicSubmissionPage({
                 </Link>
               </>
             )}
+            <span style={styles.dot}>·</span>
+            <span>{AGE_BAND_LABELS[sub.age_band] ?? sub.age_band}</span>
             {sub.published_at && (
               <>
                 <span style={styles.dot}>·</span>
