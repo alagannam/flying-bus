@@ -23,6 +23,7 @@ type PublicProfile = {
   bio: string | null
   creator_level: number
   creator_score: number
+  joined_at: string
 }
 
 type EarnedBadge = {
@@ -69,7 +70,7 @@ export default async function PublicProfilePage({
   // notFound() here — no information leaked about which it is.
   const { data: rawProfile } = await supabase
     .from('youth_profiles')
-    .select('user_id, display_name, username, bio, creator_level, creator_score')
+    .select('user_id, display_name, username, bio, creator_level, creator_score, joined_at')
     .eq('username', username)
     .eq('is_profile_public', true)
     .maybeSingle()
@@ -91,7 +92,7 @@ export default async function PublicProfilePage({
       .eq('youth_user_id', profile.user_id)
       .eq('status', 'published')
       .order('published_at', { ascending: false })
-      .limit(5),
+      .limit(10),
   ])
 
   const badges = (badgesResult.data ?? []) as EarnedBadge[]
@@ -114,6 +115,8 @@ export default async function PublicProfilePage({
           {profile.bio && (
             <p style={styles.bio}>{profile.bio}</p>
           )}
+
+          <p style={styles.joinedAt}>Member since {formatDate(profile.joined_at)}</p>
         </div>
 
         {/* ── Creator score ──────────────────────────────────── */}
@@ -125,9 +128,13 @@ export default async function PublicProfilePage({
         </div>
 
         {/* ── Badges ─────────────────────────────────────────── */}
-        {badges.length > 0 && (
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Badges</h2>
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Badges</h2>
+          {badges.length === 0 ? (
+            <div style={styles.empty}>
+              <p style={styles.emptyText}>No badges earned yet.</p>
+            </div>
+          ) : (
             <div style={styles.badgeGrid}>
               {badges.map(b => (
                 <div key={b.badge_slug} style={styles.badgeCard}>
@@ -145,8 +152,8 @@ export default async function PublicProfilePage({
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* ── Published work ─────────────────────────────────── */}
         <div style={styles.section}>
@@ -234,6 +241,10 @@ const styles = {
     fontSize: 'var(--text-base)',
     color: 'var(--color-text-secondary)',
     lineHeight: 'var(--leading-relaxed)',
+  },
+  joinedAt: {
+    fontSize: 'var(--text-xs)',
+    color: 'var(--color-text-muted)',
   },
   scoreRow: {
     display: 'flex',

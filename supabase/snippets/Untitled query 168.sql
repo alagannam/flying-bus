@@ -1,15 +1,12 @@
-insert into public.notifications (
-  user_id,
-  type,
-  title,
-  body,
-  read_at
-)
 select
-  yp.user_id,
-  'parent_approved',
-  'Dashboard unread test',
-  'This notification should appear unread on the dashboard.',
-  null
-from public.youth_profiles yp
-where yp.username = 'test12';
+  title,
+  status,
+  published_at
+from public.submissions
+where youth_user_id = (
+  select user_id
+  from public.youth_profiles
+  where username = 'test12'
+)
+order by published_at desc nulls last
+limit 15;
