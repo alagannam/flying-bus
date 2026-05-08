@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'My Kana Coins' }
 
@@ -66,6 +69,7 @@ export default async function CoinsPage() {
           <p style={styles.heroLabel}>Kana Coins</p>
           <p style={styles.heroBalance}>{balance.toLocaleString()}</p>
           <p style={styles.heroSub}>Your current balance</p>
+          <Link href="/shop" style={styles.shopLink}>Visit the shop →</Link>
         </div>
 
         {/* ── Transaction history ────────────────────────────── */}
@@ -155,6 +159,13 @@ const styles = {
     fontSize: 'var(--text-sm)',
     color: 'var(--color-text-muted)',
     margin: 0,
+  },
+  shopLink: {
+    fontSize: 'var(--text-sm)',
+    fontWeight: 'var(--font-medium)',
+    color: 'var(--color-primary)',
+    textDecoration: 'none',
+    marginTop: 'var(--space-2)',
   },
 
   // ── History ───────────────────────────────────────────────────

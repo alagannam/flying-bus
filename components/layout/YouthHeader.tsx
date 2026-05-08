@@ -13,7 +13,7 @@ interface YouthHeaderProps {
 
 const NAV_LINKS = [
   { label: 'Home',         href: '/dashboard' },
-  { label: 'My Clubs',     href: '/my-clubs' },
+  { label: 'Clubs',        href: '/clubs' },
   { label: 'Challenges',   href: '/challenges' },
   { label: 'Kana Channel', href: '/kana-channel' },
   { label: 'Leaderboards', href: '/leaderboards' },

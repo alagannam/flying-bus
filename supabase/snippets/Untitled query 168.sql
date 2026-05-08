@@ -1,12 +1,8 @@
-select
-  title,
-  status,
-  published_at
-from public.submissions
-where youth_user_id = (
-  select user_id
-  from public.youth_profiles
-  where username = 'test12'
-)
-order by published_at desc nulls last
-limit 15;
+update public.users
+set account_type = 'moderator',
+    account_status = 'active'
+where id = (
+  select id
+  from auth.users
+  where email = 'parent1@test.com'
+);
