@@ -14,6 +14,7 @@ const ALL_NAV_LINKS = [
   { label: 'Coins',         href: '/admin/coins',         roles: ['admin'] },
   { label: 'Roles',         href: '/admin/roles',         roles: ['admin'] },
   { label: 'Sponsors',      href: '/admin/sponsors',      roles: ['admin'] },
+  { label: 'Settings',      href: '/admin/settings',      roles: ['admin'] },
 ]
 
 export function AdminHeader({ accountType }: { accountType: AccountType }) {

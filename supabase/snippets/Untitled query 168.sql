@@ -1,8 +1,8 @@
-update public.users
-set account_type = 'moderator',
-    account_status = 'active'
-where id = (
-  select id
-  from auth.users
-  where email = 'parent1@test.com'
-);
+select
+  a.email,
+  u.account_type,
+  u.account_status
+from public.users u
+join auth.users a
+  on a.id = u.id
+where a.email = 'parent1@test.com';
