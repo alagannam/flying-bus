@@ -64,6 +64,48 @@ export type Database = {
         }
         Relationships: []
       }
+      challenges: {
+        Row: {
+          age_bands: Database["public"]["Enums"]["age_band"][] | null
+          category: string | null
+          created_at: string
+          description: string | null
+          ends_at: string | null
+          id: string
+          is_active: boolean
+          slug: string
+          sort_order: number
+          starts_at: string | null
+          title: string
+        }
+        Insert: {
+          age_bands?: Database["public"]["Enums"]["age_band"][] | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          slug: string
+          sort_order?: number
+          starts_at?: string | null
+          title: string
+        }
+        Update: {
+          age_bands?: Database["public"]["Enums"]["age_band"][] | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          slug?: string
+          sort_order?: number
+          starts_at?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       club_memberships: {
         Row: {
           club_id: string
