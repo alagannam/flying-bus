@@ -152,6 +152,23 @@ export async function approveSubmission(
     reference_id: id,
   })
 
+  // Audit event — best-effort observability. The submission status is the
+  // source of truth; a missed audit row is logged but does not fail the action.
+  try {
+    const { error: auditError } = await service.from('audit_events').insert({
+      event_type:    'submission_published',
+      actor_user_id: userId,
+      target_type:   'submission',
+      target_id:     id,
+      payload:       { coins_awarded: coinAmount },
+    })
+    if (auditError) {
+      console.error('[approveSubmission] audit_events insert failed', { id, auditError })
+    }
+  } catch (err) {
+    console.error('[approveSubmission] audit_events insert threw', { id, err })
+  }
+
   redirect('/admin/submissions')
 }
 
@@ -215,6 +232,23 @@ export async function rejectSubmission(
     body: note.trim(),
     reference_id: id,
   })
+
+  // Audit event — best-effort observability. The submission status is the
+  // source of truth; a missed audit row is logged but does not fail the action.
+  try {
+    const { error: auditError } = await service.from('audit_events').insert({
+      event_type:    'submission_rejected',
+      actor_user_id: userId,
+      target_type:   'submission',
+      target_id:     id,
+      payload:       { review_note: note.trim() },
+    })
+    if (auditError) {
+      console.error('[rejectSubmission] audit_events insert failed', { id, auditError })
+    }
+  } catch (err) {
+    console.error('[rejectSubmission] audit_events insert threw', { id, err })
+  }
 
   redirect('/admin/submissions')
 }
