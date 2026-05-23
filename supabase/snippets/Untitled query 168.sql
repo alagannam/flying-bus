@@ -1,3 +1,3 @@
-update public.challenges
-set is_active = true
-where slug = 'kindness-week';
+update public.platform_config
+set value = '11'
+where key = 'coin_earn_text_submission';
