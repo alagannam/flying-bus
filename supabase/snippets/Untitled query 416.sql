@@ -1,8 +1,6 @@
-select
-  id,
-  title,
-  status
-from public.submissions
-where status = 'published'
-order by published_at desc nulls last, created_at desc
-limit 10;
+select award_coins(
+  (select user_id from public.youth_profiles where username = 'test1'),
+  200,
+  'admin_grant',
+  null
+);

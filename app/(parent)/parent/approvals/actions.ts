@@ -96,6 +96,24 @@ export async function parentApprove(submissionId: string): Promise<ActionResult>
     reference_id: submissionId,
   })
 
+  // Audit event — best-effort observability. The submission status update
+  // is the source of truth; a missed audit row is logged but does not fail
+  // the action.
+  try {
+    const { error: auditError } = await service.from('audit_events').insert({
+      event_type:    'submission_parent_approved',
+      actor_user_id: userId,
+      target_type:   'submission',
+      target_id:     submissionId,
+      payload:       {},
+    })
+    if (auditError) {
+      console.error('[parentApprove] audit_events insert failed', { submissionId, auditError })
+    }
+  } catch (err) {
+    console.error('[parentApprove] audit_events insert threw', { submissionId, err })
+  }
+
   redirect('/parent/approvals')
 }
 
@@ -160,6 +178,24 @@ export async function parentReject(
     body: note.trim(),
     reference_id: submissionId,
   })
+
+  // Audit event — best-effort observability. The submission status update
+  // is the source of truth; a missed audit row is logged but does not fail
+  // the action.
+  try {
+    const { error: auditError } = await service.from('audit_events').insert({
+      event_type:    'submission_parent_rejected',
+      actor_user_id: userId,
+      target_type:   'submission',
+      target_id:     submissionId,
+      payload:       { parent_review_note: note.trim() },
+    })
+    if (auditError) {
+      console.error('[parentReject] audit_events insert failed', { submissionId, auditError })
+    }
+  } catch (err) {
+    console.error('[parentReject] audit_events insert threw', { submissionId, err })
+  }
 
   redirect('/parent/approvals')
 }
@@ -269,6 +305,24 @@ export async function approveSpend(requestId: string): Promise<ActionResult> {
     reference_id: req.id,
   })
 
+  // Audit event — best-effort observability. The spend request status,
+  // coin deduction, and badge grant are the source of truth; a missed
+  // audit row is logged but does not fail the action.
+  try {
+    const { error: auditError } = await service.from('audit_events').insert({
+      event_type:    'spend_approved',
+      actor_user_id: parentUserId,
+      target_type:   'coin_spend_request',
+      target_id:     requestId,
+      payload:       { coins_amount: req.coins_amount, shop_item_id: req.shop_item_id ?? null },
+    })
+    if (auditError) {
+      console.error('[approveSpend] audit_events insert failed', { requestId, auditError })
+    }
+  } catch (err) {
+    console.error('[approveSpend] audit_events insert threw', { requestId, err })
+  }
+
   return {}
 }
 
@@ -282,7 +336,7 @@ export async function rejectSpend(requestId: string): Promise<ActionResult> {
 
   const { data: rawRequest } = await service
     .from('coin_spend_requests')
-    .select('id, parent_user_id, youth_user_id, shop_item_id, status')
+    .select('id, parent_user_id, youth_user_id, shop_item_id, status, coins_amount')
     .eq('id', requestId)
     .single()
 
@@ -292,6 +346,7 @@ export async function rejectSpend(requestId: string): Promise<ActionResult> {
     youth_user_id: string
     shop_item_id: string
     status: string
+    coins_amount: number
   } | null
 
   if (!req) return { error: 'Request not found.' }
@@ -327,6 +382,24 @@ export async function rejectSpend(requestId: string): Promise<ActionResult> {
     body:         `Your request for "${itemRow?.name ?? 'an item'}" was not approved.`,
     reference_id: req.id,
   })
+
+  // Audit event — best-effort observability. The spend request status
+  // is the source of truth; a missed audit row is logged but does not
+  // fail the action.
+  try {
+    const { error: auditError } = await service.from('audit_events').insert({
+      event_type:    'spend_rejected',
+      actor_user_id: parentUserId,
+      target_type:   'coin_spend_request',
+      target_id:     requestId,
+      payload:       { coins_amount: req.coins_amount },
+    })
+    if (auditError) {
+      console.error('[rejectSpend] audit_events insert failed', { requestId, auditError })
+    }
+  } catch (err) {
+    console.error('[rejectSpend] audit_events insert threw', { requestId, err })
+  }
 
   return {}
 }
