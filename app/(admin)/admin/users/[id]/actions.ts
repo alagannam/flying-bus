@@ -109,5 +109,27 @@ export async function setAccountStatus(
     }
   }
 
+  // Audit event — best-effort observability. Both the DB status update and
+  // the Auth ban sync have succeeded by this point; the audit row reflects
+  // a clean transition. A missed audit row is logged but does not fail the
+  // action.
+  try {
+    const { error: auditError } = await service.from('audit_events').insert({
+      event_type:    'account_status_changed',
+      actor_user_id: staffUserId,
+      target_type:   'user',
+      target_id:     targetUserId,
+      payload:       {
+        old_status: target.account_status,
+        new_status: newStatus,
+      },
+    })
+    if (auditError) {
+      console.error('[setAccountStatus] audit_events insert failed', { targetUserId, auditError })
+    }
+  } catch (err) {
+    console.error('[setAccountStatus] audit_events insert threw', { targetUserId, err })
+  }
+
   redirect(`/admin/users/${targetUserId}`)
 }
