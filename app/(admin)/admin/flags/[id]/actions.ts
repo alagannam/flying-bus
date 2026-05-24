@@ -76,5 +76,23 @@ export async function reviewFlag(
     return { error: 'Could not save your decision. Please try again.' }
   }
 
+  // Audit event — best-effort observability. The report status update is the
+  // source of truth; a missed audit row is logged but does not fail the action.
+  const notePayload = moderatorNote.trim() || null
+  try {
+    const { error: auditError } = await service.from('audit_events').insert({
+      event_type:    'flag_reviewed',
+      actor_user_id: userId,
+      target_type:   'content_report',
+      target_id:     reportId,
+      payload:       { status: decision, moderator_note: notePayload },
+    })
+    if (auditError) {
+      console.error('[reviewFlag] audit_events insert failed', { reportId, auditError })
+    }
+  } catch (err) {
+    console.error('[reviewFlag] audit_events insert threw', { reportId, err })
+  }
+
   redirect('/admin/flags')
 }

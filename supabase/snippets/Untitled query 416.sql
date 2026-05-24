@@ -1,8 +1,8 @@
-update public.guardian_links
-set publish_requires_approval = false
-where child_user_id = (
-  select user_id
-  from public.youth_profiles
-  where username = 'test12'
-)
-and status = 'active';
+select
+  id,
+  title,
+  status
+from public.submissions
+where status = 'published'
+order by published_at desc nulls last, created_at desc
+limit 10;
