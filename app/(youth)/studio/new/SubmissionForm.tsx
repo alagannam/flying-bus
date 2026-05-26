@@ -5,7 +5,13 @@ import { saveDraft, createAndSubmit } from '../actions'
 
 type Club = { id: string; name: string }
 
-export function SubmissionForm({ clubs }: { clubs: Club[] }) {
+type Props = {
+  clubs: Club[]
+  challengeId?: string
+  challengeTitle?: string
+}
+
+export function SubmissionForm({ clubs, challengeId, challengeTitle }: Props) {
   const [title,  setTitle]  = useState('')
   const [body,   setBody]   = useState('')
   const [clubId, setClubId] = useState('')
@@ -17,6 +23,7 @@ export function SubmissionForm({ clubs }: { clubs: Club[] }) {
     fd.append('title',   title)
     fd.append('body',    body)
     fd.append('club_id', clubId)
+    if (challengeId) fd.append('challenge_id', challengeId)
     return fd
   }
 
@@ -41,6 +48,12 @@ export function SubmissionForm({ clubs }: { clubs: Club[] }) {
 
   return (
     <div style={styles.wrapper}>
+      {challengeTitle && (
+        <div style={styles.challengeBanner}>
+          Responding to challenge: <strong>{challengeTitle}</strong>
+        </div>
+      )}
+
       {error && (
         <div role="alert" style={styles.error}>{error}</div>
       )}
@@ -138,6 +151,14 @@ const styles = {
     borderRadius: 'var(--radius-md)',
     padding: 'var(--space-3) var(--space-4)',
     fontSize: 'var(--text-sm)',
+  },
+  challengeBanner: {
+    background: 'var(--color-info-surface)',
+    color: 'var(--color-info)',
+    borderRadius: 'var(--radius-md)',
+    padding: 'var(--space-3) var(--space-4)',
+    fontSize: 'var(--text-sm)',
+    border: '1px solid var(--color-info)',
   },
   field: { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-2)' },
   labelRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' },

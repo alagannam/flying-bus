@@ -71,6 +71,11 @@ export async function signUpParent(form: FormData): Promise<{ error?: string }> 
 
   const parentUserId = authData.user.id
 
+  console.log('[signUpParent] auth user created', {
+    parentUserId: authData?.user?.id,
+    email,
+  })
+
   // Insert users row
   const { error: usersError } = await supabase.from('users').insert({
     id: parentUserId,
@@ -79,6 +84,14 @@ export async function signUpParent(form: FormData): Promise<{ error?: string }> 
     account_status: 'active',
     email_verified: true,
   })
+
+  if (usersError) {
+    console.error('[signUpParent] users insert failed', {
+      usersError,
+      parentUserId,
+      email,
+    })
+  }
 
   if (usersError) {
     await supabase.auth.admin.deleteUser(parentUserId)

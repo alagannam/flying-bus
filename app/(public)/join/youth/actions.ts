@@ -6,6 +6,7 @@ import {
   computeAgeBandChangesOn,
   computePlatformExitDate,
 } from '@/lib/utils/age-band'
+import { sendParentInviteEmail } from '@/lib/email'
 import { createHash, randomBytes } from 'crypto'
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/
@@ -127,7 +128,12 @@ export async function signUpYouth(form: FormData): Promise<{ error?: string }> {
     expires_at: expiresAt.toISOString(),
   })
 
-  // TODO: sendParentConsentEmail({ parentEmail, childDisplayName: displayName, token: rawToken })
+  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const inviteUrl = `${appUrl}/join/parent?token=${rawToken}`
+  await sendParentInviteEmail(parentEmail, displayName, inviteUrl).catch(err => {
+    console.error('[signUpYouth] sendParentInviteEmail failed', err)
+  })
+
   // TODO: createThirdwebWallet(userId) — when Thirdweb SDK is configured
 
   return {}

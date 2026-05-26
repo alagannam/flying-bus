@@ -23,6 +23,7 @@ function dateRange(starts_at: string | null, ends_at: string | null): string | n
 }
 
 type ChallengeRow = {
+  id:          string
   slug:        string
   title:       string
   description: string | null
@@ -60,7 +61,7 @@ export default async function ChallengeDetailPage({
   // callers cannot distinguish the two cases.
   const { data: rawChallenge } = await supabase
     .from('challenges')
-    .select('slug, title, description, category, age_bands, starts_at, ends_at')
+    .select('id, slug, title, description, category, age_bands, starts_at, ends_at')
     .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle()
@@ -107,7 +108,10 @@ export default async function ChallengeDetailPage({
 
         {/* ── CTA ───────────────────────────────────────────── */}
         <div style={styles.ctaRow}>
-          <Link href="/studio/new" style={styles.ctaButton}>
+          <Link
+            href={`/studio/new?challenge_id=${challenge.id}&challenge_slug=${challenge.slug}`}
+            style={styles.ctaButton}
+          >
             Submit your work →
           </Link>
         </div>

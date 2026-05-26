@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ReportButton } from './ReportButton'
 
+export const dynamic = 'force-dynamic'
+
 function formatDate(iso: string | null) {
   if (!iso) return null
   return new Date(iso).toLocaleDateString('en-US', {
@@ -61,9 +63,13 @@ export default async function PublicSubmissionPage({
   if (!rawSub) notFound()
   const sub = rawSub as SubRow
 
-  // Fetch author, club, and viewer session in parallel.
-  // getUser() is safe on the anon client — returns null if not signed in.
-  const [profileResult, clubResult, { data: { user } }] = await Promise.all([
+  // Read the viewer's session first, on its own. Calling getUser() inside
+  // Promise.all alongside table queries was returning null here even when
+  // the same client returned a user in the header — pulling it out fixes it.
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Fetch author and club in parallel.
+  const [profileResult, clubResult] = await Promise.all([
     supabase
       .from('youth_profiles')
       .select('display_name, username')
@@ -72,7 +78,6 @@ export default async function PublicSubmissionPage({
     sub.club_id
       ? supabase.from('clubs').select('name, slug').eq('id', sub.club_id).maybeSingle()
       : Promise.resolve({ data: null }),
-    supabase.auth.getUser(),
   ])
 
   // Viewer can report if signed in and is not the author.

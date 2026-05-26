@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { JoinButton } from './JoinButton'
 
 function formatDate(iso: string | null) {
   if (!iso) return null
@@ -65,6 +66,22 @@ export default async function ClubPage({
   if (!rawClub) notFound()
   const club = rawClub as ClubRow
 
+  // Membership awareness — only meaningful for signed-in users.
+  // anon getUser() returns null safely; the membership query is
+  // skipped entirely when there's no session.
+  const { data: { user } } = await supabase.auth.getUser()
+  let isMember = false
+  if (user) {
+    const { data: membershipRow } = await supabase
+      .from('club_memberships')
+      .select('club_id')
+      .eq('user_id', user.id)
+      .eq('club_id', club.id)
+      .eq('is_active', true)
+      .maybeSingle()
+    isMember = !!membershipRow
+  }
+
   const { data: rawSubs } = await supabase
     .from('submissions')
     .select('id, title, youth_user_id, published_at')
@@ -107,6 +124,9 @@ export default async function ClubPage({
           <p style={styles.description}>{club.description}</p>
           {club.mission && (
             <p style={styles.mission}>{club.mission}</p>
+          )}
+          {user && (
+            <JoinButton clubId={club.id} isMember={isMember} />
           )}
         </div>
 

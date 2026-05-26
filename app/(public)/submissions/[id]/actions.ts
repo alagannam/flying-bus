@@ -60,7 +60,9 @@ export async function reportSubmission(
   // 6. Insert the report.
   //    The UNIQUE(reporter_user_id, target_type, target_id) constraint
   //    handles duplicate reports — no pre-check needed.
-  const { error: insertError } = await service
+  //    .select('id').single() captures the new row's id so the audit
+  //    event below can target it (pairs with flag_reviewed by target_id).
+  const { data: reportRow, error: insertError } = await service
     .from('content_reports')
     .insert({
       reporter_user_id: user.id,
@@ -69,6 +71,8 @@ export async function reportSubmission(
       reason,
       detail:           detail ?? null,
     })
+    .select('id')
+    .single()
 
   if (insertError) {
     if (insertError.code === '23505') {
@@ -76,6 +80,29 @@ export async function reportSubmission(
     }
     console.error('[reportSubmission] insert error', insertError)
     return { error: 'Could not submit your report. Please try again.' }
+  }
+
+  // Audit event — best-effort observability. The content_reports row is
+  // the source of truth; a missed audit row is logged but does not fail
+  // the action. target_type/target_id reference the new report row so
+  // this event pairs with the later flag_reviewed event by target_id.
+  try {
+    const { error: auditError } = await service.from('audit_events').insert({
+      event_type:    'flag_filed',
+      actor_user_id: user.id,
+      target_type:   'content_report',
+      target_id:     reportRow.id,
+      payload:       {
+        target_submission_id: submissionId,
+        reason,
+        detail: detail ?? null,
+      },
+    })
+    if (auditError) {
+      console.error('[reportSubmission] audit_events insert failed', { reportId: reportRow.id, auditError })
+    }
+  } catch (err) {
+    console.error('[reportSubmission] audit_events insert threw', { reportId: reportRow.id, err })
   }
 
   return {}

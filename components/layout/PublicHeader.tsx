@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
@@ -9,7 +10,12 @@ const NAV_LINKS = [
   { label: 'Impact',       href: '/impact' },
 ]
 
-export function PublicHeader() {
+export async function PublicHeader() {
+  // Read session so the right-side actions reflect the real auth state.
+  // Anon client + getUser() — returns null if not signed in.
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   return (
     <header style={styles.header}>
       <div style={styles.inner}>
@@ -26,12 +32,20 @@ export function PublicHeader() {
         </nav>
 
         <div style={styles.actions}>
-          <Link href={`${APP_URL}/login`} style={styles.loginLink}>
-            Log in
-          </Link>
-          <Link href={`${APP_URL}/join/youth`} style={styles.joinButton}>
-            Join the mission
-          </Link>
+          {user ? (
+            <Link href={`${APP_URL}/dashboard`} style={styles.joinButton}>
+              Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link href={`${APP_URL}/login`} style={styles.loginLink}>
+                Log in
+              </Link>
+              <Link href={`${APP_URL}/join/youth`} style={styles.joinButton}>
+                Join the mission
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

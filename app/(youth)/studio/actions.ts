@@ -35,9 +35,10 @@ function validate(title: string, body: string): string | null {
 // Saves a new draft and redirects to the studio landing page.
 
 export async function saveDraft(formData: FormData): Promise<ActionResult> {
-  const title  = String(formData.get('title')   ?? '').trim()
-  const body   = String(formData.get('body')    ?? '').trim()
-  const clubId = String(formData.get('club_id') ?? '').trim() || null
+  const title       = String(formData.get('title')        ?? '').trim()
+  const body        = String(formData.get('body')         ?? '').trim()
+  const clubId      = String(formData.get('club_id')      ?? '').trim() || null
+  const challengeId = String(formData.get('challenge_id') ?? '').trim() || null
 
   const err = validate(title, body)
   if (err) return { error: err }
@@ -46,7 +47,15 @@ export async function saveDraft(formData: FormData): Promise<ActionResult> {
 
   const { error } = await createServiceClient()
     .from('submissions')
-    .insert({ youth_user_id: userId, title, body, club_id: clubId, age_band: ageBand, status: 'draft' })
+    .insert({
+      youth_user_id: userId,
+      title,
+      body,
+      club_id:       clubId,
+      challenge_id:  challengeId,
+      age_band:      ageBand,
+      status:        'draft',
+    })
 
   if (error) return { error: 'Could not save your draft. Please try again.' }
 
@@ -59,9 +68,10 @@ export async function saveDraft(formData: FormData): Promise<ActionResult> {
 // Redirects to the submission's detail page on success.
 
 export async function createAndSubmit(formData: FormData): Promise<ActionResult> {
-  const title  = String(formData.get('title')   ?? '').trim()
-  const body   = String(formData.get('body')    ?? '').trim()
-  const clubId = String(formData.get('club_id') ?? '').trim() || null
+  const title       = String(formData.get('title')        ?? '').trim()
+  const body        = String(formData.get('body')         ?? '').trim()
+  const clubId      = String(formData.get('club_id')      ?? '').trim() || null
+  const challengeId = String(formData.get('challenge_id') ?? '').trim() || null
 
   const err = validate(title, body)
   if (err) return { error: err }
@@ -72,7 +82,15 @@ export async function createAndSubmit(formData: FormData): Promise<ActionResult>
   // Insert draft first so we have an id for the rest of the flow
   const { data: rawSubmission, error: insertError } = await service
     .from('submissions')
-    .insert({ youth_user_id: userId, title, body, club_id: clubId, age_band: ageBand, status: 'draft' })
+    .insert({
+      youth_user_id: userId,
+      title,
+      body,
+      club_id:       clubId,
+      challenge_id:  challengeId,
+      age_band:      ageBand,
+      status:        'draft',
+    })
     .select('id')
     .single()
 

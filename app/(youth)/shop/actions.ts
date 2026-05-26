@@ -103,6 +103,27 @@ export async function initiatePurchase(itemId: string): Promise<PurchaseResult> 
       reference_id: spendRequest.id,
     })
 
+    // Audit event — best-effort observability. The coin_spend_requests row
+    // is the source of truth; a missed audit row is logged but does not
+    // fail the action. Pairs with spend_approved / spend_rejected by target_id.
+    try {
+      const { error: auditError } = await service.from('audit_events').insert({
+        event_type:    'spend_requested',
+        actor_user_id: user.id,
+        target_type:   'coin_spend_request',
+        target_id:     spendRequest.id,
+        payload:       {
+          coins_amount: item.price_coins,
+          shop_item_id: item.id,
+        },
+      })
+      if (auditError) {
+        console.error('[initiatePurchase] audit_events insert failed', { spendRequestId: spendRequest.id, auditError })
+      }
+    } catch (err) {
+      console.error('[initiatePurchase] audit_events insert threw', { spendRequestId: spendRequest.id, err })
+    }
+
     return { status: 'pending_approval' }
   }
 

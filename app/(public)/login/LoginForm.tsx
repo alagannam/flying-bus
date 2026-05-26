@@ -103,6 +103,7 @@ export function LoginForm() {
           style={styles.input}
           disabled={isPending}
         />
+        <a href="/forgot-password" style={styles.forgot}>Forgot password?</a>
       </div>
 
       <button type="submit" style={styles.submit} disabled={isPending}>
@@ -160,5 +161,12 @@ const styles = {
     fontSize: 'var(--text-sm)',
     cursor: 'pointer',
     marginTop: 'var(--space-2)',
+  },
+  forgot: {
+    fontSize: 'var(--text-xs)',
+    color: 'var(--color-text-muted)',
+    textDecoration: 'none',
+    alignSelf: 'flex-end' as const,
+    marginTop: 'var(--space-1)',
   },
 } as const

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Dashboard' }
@@ -29,6 +29,16 @@ const STATUS_COLORS: Record<SubmissionStatus, { bg: string; color: string }> = {
   rejected:                { bg: 'var(--color-error-surface)',   color: 'var(--color-error)' },
 }
 
+// Level thresholds mirror the increment_creator_score RPC in migration 009
+// (Level 1→2: 50, 2→3: 150, 3→4: 300, 4→5: 500). Keep these in sync if the
+// DB function ever changes — they're the single source of truth for level math.
+const LEVEL_THRESHOLDS: Record<number, number> = {
+  1: 50,
+  2: 150,
+  3: 300,
+  4: 500,
+}
+
 function formatDate(iso: string | null) {
   if (!iso) return null
   return new Date(iso).toLocaleDateString('en-US', {
@@ -45,6 +55,29 @@ function submissionDateLabel(s: {
   if (s.published_at) return `Published ${formatDate(s.published_at)}`
   if (s.submitted_at) return `Submitted ${formatDate(s.submitted_at)}`
   return `Saved ${formatDate(s.created_at)}`
+}
+
+// Calendar-day difference between now and endsAt.
+// null if endsAt is null or already past.
+function daysRemaining(endsAt: string | null): string | null {
+  if (!endsAt) return null
+  const end = new Date(endsAt)
+  const now = new Date()
+  if (end.getTime() < now.getTime()) return null
+
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const days = Math.round((endDay.getTime() - nowDay.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (days <= 0) return 'Ends today'
+  if (days === 1) return '1 day left'
+  return `${days} days left`
+}
+
+function pointsToNextLevel(currentLevel: number, score: number): number {
+  const next = LEVEL_THRESHOLDS[currentLevel]
+  if (next == null) return 0
+  return Math.max(0, next - score)
 }
 
 type Profile = {
@@ -71,13 +104,35 @@ type RecentNotif = {
   created_at: string
 }
 
+type ActiveChallenge = {
+  id: string
+  slug: string
+  title: string
+  description: string | null
+  category: string | null
+  starts_at: string | null
+  ends_at: string | null
+}
+
+type MembershipRow = {
+  club_id: string
+  clubs: {
+    id:          string
+    name:        string
+    slug:        string
+    description: string
+    is_active:   boolean
+  } | null
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
+  const service  = createServiceClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileResult, subsResult, notifsResult] = await Promise.all([
+  const [profileResult, subsResult, notifsResult, challengeResult, membershipsResult] = await Promise.all([
     supabase
       .from('youth_profiles')
       .select('display_name, creator_level, coins_balance, creator_score, streak_current')
@@ -98,13 +153,38 @@ export default async function DashboardPage() {
       .is('read_at', null)
       .order('created_at', { ascending: false })
       .limit(3),
+
+    service
+      .from('challenges')
+      .select('id, slug, title, description, category, starts_at, ends_at')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+
+    supabase
+      .from('club_memberships')
+      .select('club_id, clubs(id, name, slug, description, is_active)')
+      .eq('user_id', user.id)
+      .eq('is_active', true),
   ])
 
   if (!profileResult.data) redirect('/login')
 
-  const profile       = profileResult.data as Profile
-  const recentSubs    = (subsResult.data   ?? []) as RecentSub[]
-  const recentNotifs  = (notifsResult.data ?? []) as RecentNotif[]
+  const profile         = profileResult.data as Profile
+  const recentSubs      = (subsResult.data   ?? []) as RecentSub[]
+  const recentNotifs    = (notifsResult.data ?? []) as RecentNotif[]
+  const activeChallenge = (challengeResult.data ?? null) as ActiveChallenge | null
+
+  const memberships = (membershipsResult.data ?? []) as unknown as MembershipRow[]
+  const myClubs = memberships
+    .map(m => m.clubs)
+    .filter((c): c is NonNullable<MembershipRow['clubs']> => c !== null && c.is_active)
+  const visibleClubs = myClubs.slice(0, 5)
+  const extraClubsCount = Math.max(0, myClubs.length - 5)
+
+  const daysLeft    = activeChallenge ? daysRemaining(activeChallenge.ends_at) : null
+  const pointsToNext = pointsToNextLevel(profile.creator_level, profile.creator_score)
 
   return (
     <div style={styles.page}>
@@ -116,9 +196,47 @@ export default async function DashboardPage() {
             <h1 style={styles.greetingName}>
               Welcome back, {profile.display_name}
             </h1>
+            {profile.streak_current > 1 && (
+              <p style={styles.streakLine}>
+                🔥 {profile.streak_current}-day streak — keep it going!
+              </p>
+            )}
           </div>
           <span style={styles.levelBadge}>Level {profile.creator_level}</span>
         </div>
+
+        {/* ── Active challenge ──────────────────────────────── */}
+        {activeChallenge ? (
+          <div style={styles.challengeCard}>
+            {activeChallenge.category && (
+              <p style={styles.challengeCategory}>
+                {activeChallenge.category.replace(/-/g, ' ')}
+              </p>
+            )}
+            <p style={styles.challengeTitle}>{activeChallenge.title}</p>
+            {activeChallenge.description && (
+              <p style={styles.challengeDesc}>{activeChallenge.description}</p>
+            )}
+            {daysLeft && (
+              <span style={styles.daysBadge}>{daysLeft}</span>
+            )}
+            <div style={styles.challengeCtaRow}>
+              <Link
+                href={`/studio/new?challenge_id=${activeChallenge.id}&challenge_slug=${activeChallenge.slug}`}
+                style={styles.challengePrimary}
+              >
+                Enter this challenge →
+              </Link>
+              <Link href="/challenges" style={styles.challengeSecondary}>
+                See all challenges
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div style={styles.challengeEmpty}>
+            <p style={styles.emptyText}>No active challenge right now — check back soon</p>
+          </div>
+        )}
 
         {/* ── Stats strip ───────────────────────────────────── */}
         <div style={styles.statsStrip}>
@@ -131,12 +249,47 @@ export default async function DashboardPage() {
             <span style={styles.statEmoji}>⭐</span>
             <p style={styles.statValue}>{profile.creator_score.toLocaleString()}</p>
             <p style={styles.statLabel}>Creator score</p>
+            {pointsToNext > 0 && (
+              <p style={styles.statSubLabel}>
+                {pointsToNext} to Level {profile.creator_level + 1}
+              </p>
+            )}
           </div>
           <div style={styles.statCard}>
             <span style={styles.statEmoji}>🔥</span>
             <p style={styles.statValue}>{profile.streak_current}</p>
             <p style={styles.statLabel}>Day streak</p>
           </div>
+        </div>
+
+        {/* ── My Clubs ──────────────────────────────────────── */}
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>My Clubs</h2>
+            <Link href="/my-clubs" style={styles.sectionLink}>See all →</Link>
+          </div>
+
+          {myClubs.length === 0 ? (
+            <div style={styles.empty}>
+              <p style={styles.emptyText}>
+                You haven&apos;t joined any clubs yet.{' '}
+                <Link href="/clubs" style={styles.emptyLink}>Browse clubs →</Link>
+              </p>
+            </div>
+          ) : (
+            <div style={styles.clubsScroll}>
+              {visibleClubs.map(club => (
+                <Link key={club.id} href={`/clubs/${club.slug}`} style={styles.clubPill}>
+                  {club.name}
+                </Link>
+              ))}
+              {extraClubsCount > 0 && (
+                <Link href="/my-clubs" style={styles.moreClubsPill}>
+                  +{extraClubsCount} more
+                </Link>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Recent notifications ──────────────────────────── */}
@@ -275,6 +428,11 @@ const styles = {
     color: 'var(--color-text)',
     lineHeight: 'var(--leading-snug)',
   },
+  streakLine: {
+    fontSize: 'var(--text-sm)',
+    color: 'var(--color-text-secondary)',
+    marginTop: 'var(--space-1)',
+  },
   levelBadge: {
     padding: 'var(--space-1) var(--space-3)',
     background: 'var(--color-primary-surface)',
@@ -284,6 +442,76 @@ const styles = {
     fontWeight: 'var(--font-semibold)',
     whiteSpace: 'nowrap' as const,
     flexShrink: 0,
+  },
+
+  // ── Active challenge ────────────────────────────────────────
+  challengeCard: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 'var(--space-2)',
+    background: 'var(--color-surface)',
+    border: '1px solid var(--color-border)',
+    borderLeft: '3px solid var(--color-primary)',
+    borderRadius: 'var(--radius-xl)',
+    padding: 'var(--space-5) var(--space-6)',
+  },
+  challengeCategory: {
+    fontSize: 'var(--text-xs)',
+    fontWeight: 'var(--font-semibold)',
+    color: 'var(--color-text-muted)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.06em',
+    margin: 0,
+  },
+  challengeTitle: {
+    fontSize: 'var(--text-lg)',
+    fontWeight: 'var(--font-bold)',
+    color: 'var(--color-text)',
+    margin: 0,
+  },
+  challengeDesc: {
+    fontSize: 'var(--text-sm)',
+    color: 'var(--color-text-secondary)',
+    lineHeight: 'var(--leading-relaxed)',
+    margin: 0,
+  },
+  daysBadge: {
+    alignSelf: 'flex-start' as const,
+    padding: '2px var(--space-2)',
+    background: 'var(--color-warning-surface)',
+    color: 'var(--color-warning)',
+    borderRadius: 'var(--radius-full)',
+    fontSize: 'var(--text-xs)',
+    fontWeight: 'var(--font-semibold)',
+  },
+  challengeCtaRow: {
+    display: 'flex',
+    gap: 'var(--space-3)',
+    flexWrap: 'wrap' as const,
+    alignItems: 'center',
+    marginTop: 'var(--space-2)',
+  },
+  challengePrimary: {
+    padding: 'var(--space-2) var(--space-4)',
+    background: 'var(--color-primary)',
+    color: '#fff',
+    borderRadius: 'var(--radius-full)',
+    fontSize: 'var(--text-sm)',
+    fontWeight: 'var(--font-semibold)',
+    textDecoration: 'none',
+  },
+  challengeSecondary: {
+    fontSize: 'var(--text-sm)',
+    color: 'var(--color-text-secondary)',
+    textDecoration: 'none',
+    fontWeight: 'var(--font-medium)',
+  },
+  challengeEmpty: {
+    background: 'var(--color-surface)',
+    border: '1px dashed var(--color-border)',
+    borderRadius: 'var(--radius-xl)',
+    padding: 'var(--space-5) var(--space-6)',
+    textAlign: 'center' as const,
   },
 
   // ── Stats strip ─────────────────────────────────────────────
@@ -313,6 +541,45 @@ const styles = {
   statLabel: {
     fontSize: 'var(--text-xs)',
     color: 'var(--color-text-muted)',
+  },
+  statSubLabel: {
+    fontSize: 'var(--text-xs)',
+    color: 'var(--color-primary)',
+    fontWeight: 'var(--font-semibold)',
+    marginTop: 'var(--space-1)',
+  },
+
+  // ── My Clubs pills ─────────────────────────────────────────
+  clubsScroll: {
+    display: 'flex',
+    flexWrap: 'nowrap' as const,
+    overflowX: 'auto' as const,
+    gap: 'var(--space-2)',
+    paddingBottom: 'var(--space-2)',
+  },
+  clubPill: {
+    flexShrink: 0,
+    background: 'var(--color-primary-surface)',
+    color: 'var(--color-primary)',
+    border: '1px solid var(--color-primary)',
+    borderRadius: 'var(--radius-full)',
+    padding: 'var(--space-2) var(--space-4)',
+    fontSize: 'var(--text-sm)',
+    fontWeight: 'var(--font-semibold)',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap' as const,
+  },
+  moreClubsPill: {
+    flexShrink: 0,
+    background: 'var(--color-surface)',
+    color: 'var(--color-text-muted)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-full)',
+    padding: 'var(--space-2) var(--space-4)',
+    fontSize: 'var(--text-sm)',
+    fontWeight: 'var(--font-medium)',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap' as const,
   },
 
   // ── Sections ─────────────────────────────────────────────────
