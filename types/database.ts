@@ -7,33 +7,51 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      audit_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json | null
+          target_id: string | null
+          target_type: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json | null
+          target_id?: string | null
+          target_type?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json | null
+          target_id?: string | null
+          target_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       badge_definitions: {
         Row: {
           created_at: string
@@ -360,6 +378,45 @@ export type Database = {
           },
         ]
       }
+      impact_campaigns: {
+        Row: {
+          created_at: string
+          description: string | null
+          ends_at: string | null
+          goal_summary: string | null
+          id: string
+          is_active: boolean
+          slug: string
+          sort_order: number
+          starts_at: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          goal_summary?: string | null
+          id?: string
+          is_active?: boolean
+          slug: string
+          sort_order?: number
+          starts_at?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          goal_summary?: string | null
+          id?: string
+          is_active?: boolean
+          slug?: string
+          sort_order?: number
+          starts_at?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       kana_ledger: {
         Row: {
           amount: number
@@ -480,6 +537,41 @@ export type Database = {
           },
         ]
       }
+      password_reset_tokens: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          token_hash: string
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          token_hash: string
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token_hash?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "password_reset_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_guardian_invites: {
         Row: {
           child_user_id: string
@@ -584,6 +676,7 @@ export type Database = {
         Row: {
           age_band: Database["public"]["Enums"]["age_band"]
           body: string
+          challenge_id: string | null
           club_id: string | null
           coins_awarded: number
           created_at: string
@@ -603,6 +696,7 @@ export type Database = {
         Insert: {
           age_band: Database["public"]["Enums"]["age_band"]
           body: string
+          challenge_id?: string | null
           club_id?: string | null
           coins_awarded?: number
           created_at?: string
@@ -622,6 +716,7 @@ export type Database = {
         Update: {
           age_band?: Database["public"]["Enums"]["age_band"]
           body?: string
+          challenge_id?: string | null
           club_id?: string | null
           coins_awarded?: number
           created_at?: string
@@ -639,6 +734,13 @@ export type Database = {
           youth_user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "submissions_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "submissions_club_id_fkey"
             columns: ["club_id"]
@@ -1075,9 +1177,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       account_status: [
@@ -1136,4 +1235,3 @@ export const Constants = {
     },
   },
 } as const
-
