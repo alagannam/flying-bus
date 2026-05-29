@@ -36,7 +36,7 @@ export default async function AdminAuditLogPage() {
 
   // Latest 100. The page is read-only and shows only what's been written
   // by future event-writer retrofits — empty initially.
-  cconst { data: rawEvents } = await service
+  const { data: rawEvents } = await service
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from('audit_events' as any)
     .order('created_at', { ascending: false })
