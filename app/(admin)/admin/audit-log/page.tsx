@@ -36,11 +36,12 @@ export default async function AdminAuditLogPage() {
 
   // Latest 100. The page is read-only and shows only what's been written
   // by future event-writer retrofits — empty initially.
-  const { data: rawEvents } = await service
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from('audit_events' as any)
-    .order('created_at', { ascending: false })
-    .limit(PAGE_LIMIT)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: rawEvents } = await (service as any)
+      .from('audit_events')
+      .select('id, event_type, actor_user_id, target_type, target_id, payload, created_at')
+      .order('created_at', { ascending: false })
+      .limit(PAGE_LIMIT)
 
   const events = (rawEvents ?? []) as AuditRow[]
 
