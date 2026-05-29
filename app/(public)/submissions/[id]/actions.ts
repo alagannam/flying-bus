@@ -87,7 +87,8 @@ export async function reportSubmission(
   // the action. target_type/target_id reference the new report row so
   // this event pairs with the later flag_reviewed event by target_id.
   try {
-    const { error: auditError } = await service.from('audit_events').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await (service as any).from('audit_events').insert({
       event_type:    'flag_filed',
       actor_user_id: user.id,
       target_type:   'content_report',

@@ -155,7 +155,8 @@ export async function approveSubmission(
   // Audit event — best-effort observability. The submission status is the
   // source of truth; a missed audit row is logged but does not fail the action.
   try {
-    const { error: auditError } = await service.from('audit_events').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await (service as any).from('audit_events').insert({
       event_type:    'submission_published',
       actor_user_id: userId,
       target_type:   'submission',
@@ -236,7 +237,8 @@ export async function rejectSubmission(
   // Audit event — best-effort observability. The submission status is the
   // source of truth; a missed audit row is logged but does not fail the action.
   try {
-    const { error: auditError } = await service.from('audit_events').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await (service as any).from('audit_events').insert({
       event_type:    'submission_rejected',
       actor_user_id: userId,
       target_type:   'submission',

@@ -114,7 +114,8 @@ export async function setAccountStatus(
   // a clean transition. A missed audit row is logged but does not fail the
   // action.
   try {
-    const { error: auditError } = await service.from('audit_events').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await (service as any).from('audit_events').insert({
       event_type:    'account_status_changed',
       actor_user_id: staffUserId,
       target_type:   'user',

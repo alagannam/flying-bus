@@ -107,7 +107,8 @@ export async function initiatePurchase(itemId: string): Promise<PurchaseResult> 
     // is the source of truth; a missed audit row is logged but does not
     // fail the action. Pairs with spend_approved / spend_rejected by target_id.
     try {
-      const { error: auditError } = await service.from('audit_events').insert({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: auditError } = await (service as any).from('audit_events').insert({
         event_type:    'spend_requested',
         actor_user_id: user.id,
         target_type:   'coin_spend_request',

@@ -100,7 +100,8 @@ export async function parentApprove(submissionId: string): Promise<ActionResult>
   // is the source of truth; a missed audit row is logged but does not fail
   // the action.
   try {
-    const { error: auditError } = await service.from('audit_events').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await (service as any).from('audit_events').insert({
       event_type:    'submission_parent_approved',
       actor_user_id: userId,
       target_type:   'submission',
@@ -183,7 +184,8 @@ export async function parentReject(
   // is the source of truth; a missed audit row is logged but does not fail
   // the action.
   try {
-    const { error: auditError } = await service.from('audit_events').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await (service as any).from('audit_events').insert({
       event_type:    'submission_parent_rejected',
       actor_user_id: userId,
       target_type:   'submission',
@@ -309,7 +311,8 @@ export async function approveSpend(requestId: string): Promise<ActionResult> {
   // coin deduction, and badge grant are the source of truth; a missed
   // audit row is logged but does not fail the action.
   try {
-    const { error: auditError } = await service.from('audit_events').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await (service as any).from('audit_events').insert({
       event_type:    'spend_approved',
       actor_user_id: parentUserId,
       target_type:   'coin_spend_request',
@@ -387,7 +390,8 @@ export async function rejectSpend(requestId: string): Promise<ActionResult> {
   // is the source of truth; a missed audit row is logged but does not
   // fail the action.
   try {
-    const { error: auditError } = await service.from('audit_events').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await (service as any).from('audit_events').insert({
       event_type:    'spend_rejected',
       actor_user_id: parentUserId,
       target_type:   'coin_spend_request',

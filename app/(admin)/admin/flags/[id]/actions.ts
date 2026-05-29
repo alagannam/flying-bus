@@ -80,7 +80,8 @@ export async function reviewFlag(
   // source of truth; a missed audit row is logged but does not fail the action.
   const notePayload = moderatorNote.trim() || null
   try {
-    const { error: auditError } = await service.from('audit_events').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await (service as any).from('audit_events').insert({
       event_type:    'flag_reviewed',
       actor_user_id: userId,
       target_type:   'content_report',
