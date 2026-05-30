@@ -32,7 +32,8 @@ export async function loginUser(
     return { error: 'invalid_credentials' }
   }
 
-  const { data: rawUserData } = await supabase
+  const service = createServiceClient()
+  const { data: rawUserData } = await service
     .from('users')
     .select('account_type')
     .eq('id', data.user.id)
