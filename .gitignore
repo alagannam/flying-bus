@@ -31,3 +31,4 @@ Thumbs.db
 # Supabase local dev (keep migrations, ignore local state)
 supabase/.branches
 supabase/.temp
+.env*

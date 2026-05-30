@@ -37,7 +37,7 @@ export function LoginForm() {
         return
       }
 
-      // Determine redirect based on account_type
+// Determine redirect based on account_type
       const { data: rawUserData } = await supabase
         .from('users')
         .select('account_type')
@@ -49,6 +49,23 @@ export function LoginForm() {
       if (!userData) {
         setError('Account not found. Please contact support.')
         return
+      }
+
+      // Gate youth accounts until a parent has linked them
+      if (userData.account_type === 'youth') {
+        const { data: rawProfile } = await supabase
+          .from('youth_profiles')
+          .select('guardian_linked')
+          .eq('user_id', data.user.id)
+          .single()
+
+        const profile = rawProfile as { guardian_linked: boolean } | null
+
+        if (!profile?.guardian_linked) {
+          await supabase.auth.signOut()
+          setError('Almost there! A parent needs to accept the invite email before you can log in.')
+          return
+        }
       }
 
       let destination = next
