@@ -62,10 +62,10 @@ export async function signUpYouth(form: FormData): Promise<{ error?: string }> {
 
   // Create Supabase auth user — Supabase sends the verification email
   // automatically based on project email settings when email_confirm: false.
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+ const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
-    email_confirm: false,
+    email_confirm: true,
   })
 
   if (authError || !authData.user) {
