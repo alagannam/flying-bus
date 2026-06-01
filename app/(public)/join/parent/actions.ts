@@ -1,6 +1,6 @@
 'use server'
 
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import {
   defaultPublishRequiresApproval,
   defaultSpendingRequiresApproval,
@@ -54,6 +54,78 @@ export async function signUpParent(form: FormData): Promise<{ error?: string }> 
 
     childAgeBand = (childProfile?.age_band ?? null) as AgeBand | null
   }
+
+  // EXISTING PARENT BRANCH — only meaningful when an invite is being honored,
+  // because the whole point of this branch is to attach a NEW child to an
+  // ALREADY-EXISTING parent account. Without a valid invite there is no child
+  // to link, so we fall through to the new-parent branch (which will then
+  // surface the "already registered" error as it did before).
+  if (token && childUserId && childAgeBand) {
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id, account_type')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (existingUser) {
+      if (existingUser.account_type !== 'parent') {
+        return { error: 'That email is already used by another account type.' }
+      }
+
+      // Verify ownership AND establish the parent's session in one step.
+      // We deliberately use the cookie-aware client here so the sign-in
+      // cookie is written; the service client cannot do that.
+      const cookieClient = await createClient()
+      const { data: signInData, error: signInError } =
+        await cookieClient.auth.signInWithPassword({ email, password })
+
+      if (signInError || !signInData.user) {
+        return {
+          error:
+            "An account with this email already exists. Enter that account's password to add this child.",
+        }
+      }
+
+      const parentUserId = signInData.user.id
+
+      // Idempotency: if this parent is already linked to this child, do not
+      // duplicate the row. We still consume the invite below so the link
+      // cannot be replayed against a different account.
+      const { data: existingLink } = await supabase
+        .from('guardian_links')
+        .select('id')
+        .eq('parent_user_id', parentUserId)
+        .eq('child_user_id', childUserId)
+        .maybeSingle()
+
+      if (!existingLink) {
+        await supabase.from('guardian_links').insert({
+          parent_user_id: parentUserId,
+          child_user_id: childUserId,
+          relationship: 'parent',
+          status: 'active',
+          publish_requires_approval: defaultPublishRequiresApproval(childAgeBand),
+          spending_requires_approval: defaultSpendingRequiresApproval(childAgeBand),
+          approved_at: new Date().toISOString(),
+        })
+
+        await supabase
+          .from('youth_profiles')
+          .update({ guardian_linked: true })
+          .eq('user_id', childUserId)
+      }
+
+      const tokenHash = createHash('sha256').update(token).digest('hex')
+      await supabase
+        .from('pending_guardian_invites')
+        .update({ consumed_at: new Date().toISOString() })
+        .eq('token_hash', tokenHash)
+
+      return {}
+    }
+  }
+
+  // NEW PARENT BRANCH — unchanged from before.
 
   // Create Supabase auth user
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
