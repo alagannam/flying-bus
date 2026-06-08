@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { fetchActiveImpactCampaign } from '@/lib/impact'
+import { ImpactJourneyBar } from '@/components/ui/ImpactJourneyBar'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Dashboard' }
@@ -132,7 +134,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileResult, subsResult, notifsResult, challengeResult, membershipsResult] = await Promise.all([
+  const [profileResult, subsResult, notifsResult, challengeResult, membershipsResult, activeCampaign] = await Promise.all([
     supabase
       .from('youth_profiles')
       .select('display_name, creator_level, coins_balance, creator_score, streak_current')
@@ -167,6 +169,8 @@ export default async function DashboardPage() {
       .select('club_id, clubs(id, name, slug, description, is_active)')
       .eq('user_id', user.id)
       .eq('is_active', true),
+
+    fetchActiveImpactCampaign(supabase),
   ])
 
   if (!profileResult.data) redirect('/login')
@@ -261,6 +265,23 @@ export default async function DashboardPage() {
             <p style={styles.statLabel}>Day streak</p>
           </div>
         </div>
+
+        {/* ── Impact journey ────────────────────────────────── */}
+        {activeCampaign && (
+          <div style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <h2 style={styles.sectionTitle}>Impact journey</h2>
+              <Link href="/impact" style={styles.sectionLink}>See impact →</Link>
+            </div>
+            <ImpactJourneyBar
+              title={activeCampaign.title}
+              goal_cents={activeCampaign.goal_cents}
+              raised_cents={activeCampaign.raised_cents}
+              recipient_name={activeCampaign.recipient_name}
+              gear_summary={activeCampaign.gear_summary}
+            />
+          </div>
+        )}
 
         {/* ── My Clubs ──────────────────────────────────────── */}
         <div style={styles.section}>

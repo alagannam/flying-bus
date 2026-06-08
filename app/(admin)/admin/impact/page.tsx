@@ -1,5 +1,8 @@
 import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase/server'
+import { fetchActiveImpactCampaign } from '@/lib/impact'
+import { ImpactJourneyBar } from '@/components/ui/ImpactJourneyBar'
+import { AdminRaisedForm } from './AdminRaisedForm'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Impact' }
@@ -39,15 +42,25 @@ export default async function AdminImpactPage() {
   // Service-role read — impact_campaigns has a public SELECT policy scoped
   // to is_active = true, so the anon client would hide inactive rows that
   // admins need to see. Service-role returns the full set.
-  const { data: rawCampaigns } = await service
-    .from('impact_campaigns')
-    .select('id, slug, title, goal_summary, starts_at, ends_at, is_active, sort_order, created_at')
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false })
+  const [{ data: rawCampaigns }, activeCampaign] = await Promise.all([
+    service
+      .from('impact_campaigns')
+      .select('id, slug, title, goal_summary, starts_at, ends_at, is_active, sort_order, created_at')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false }),
+    fetchActiveImpactCampaign(service),
+  ])
 
   const campaigns   = (rawCampaigns ?? []) as CampaignRow[]
   const activeCount = campaigns.filter(c => c.is_active).length
   const totalCount  = campaigns.length
+
+  const initialRaisedDollars = activeCampaign
+    ? (activeCampaign.raised_cents / 100).toFixed(2)
+    : ''
+  const goalDollarsLabel = activeCampaign
+    ? '$' + Math.floor(activeCampaign.goal_cents / 100).toLocaleString('en-US')
+    : ''
 
   return (
     <div style={styles.page}>
@@ -56,8 +69,32 @@ export default async function AdminImpactPage() {
         {/* ── Page header ───────────────────────────────────── */}
         <div style={styles.pageHeader}>
           <h1 style={styles.heading}>Impact</h1>
-          <p style={styles.sub}>Read-only view of all impact campaigns, active and inactive.</p>
+          <p style={styles.sub}>Manage the live impact figure for the active campaign. The table below lists all campaigns.</p>
         </div>
+
+        {/* ── Active campaign — preview + raised editor ─────── */}
+        {activeCampaign && (
+          <section style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <p style={styles.sectionTitle}>Active campaign</p>
+            </div>
+
+            <ImpactJourneyBar
+              title={activeCampaign.title}
+              goal_cents={activeCampaign.goal_cents}
+              raised_cents={activeCampaign.raised_cents}
+              recipient_name={activeCampaign.recipient_name}
+              gear_summary={activeCampaign.gear_summary}
+            />
+
+            <AdminRaisedForm
+              campaignId={activeCampaign.id}
+              campaignTitle={activeCampaign.title}
+              initialRaisedDollars={initialRaisedDollars}
+              goalDollarsLabel={goalDollarsLabel}
+            />
+          </section>
+        )}
 
         {/* ── Campaigns table ───────────────────────────────── */}
         <section style={styles.section}>

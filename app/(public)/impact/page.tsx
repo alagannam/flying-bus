@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { fetchActiveImpactCampaign } from '@/lib/impact'
+import { ImpactJourneyBar } from '@/components/ui/ImpactJourneyBar'
 
 export const metadata: Metadata = { title: 'Impact' }
 
@@ -30,13 +32,16 @@ type CampaignRow = {
 export default async function ImpactPage() {
   const supabase = await createClient()
 
-  const { data: rawCampaigns } = await supabase
-    .from('impact_campaigns')
-    .select('id, slug, title, description, goal_summary, starts_at, ends_at')
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true })
+  const [campaignsResult, activeCampaign] = await Promise.all([
+    supabase
+      .from('impact_campaigns')
+      .select('id, slug, title, description, goal_summary, starts_at, ends_at')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true }),
+    fetchActiveImpactCampaign(supabase),
+  ])
 
-  const campaigns = (rawCampaigns ?? []) as CampaignRow[]
+  const campaigns = (campaignsResult.data ?? []) as CampaignRow[]
 
   return (
     <div style={styles.page}>
@@ -49,6 +54,16 @@ export default async function ImpactPage() {
             Sponsor-backed campaigns let creators help other kids around the world.
           </p>
         </div>
+
+        {activeCampaign && (
+          <ImpactJourneyBar
+            title={activeCampaign.title}
+            goal_cents={activeCampaign.goal_cents}
+            raised_cents={activeCampaign.raised_cents}
+            recipient_name={activeCampaign.recipient_name}
+            gear_summary={activeCampaign.gear_summary}
+          />
+        )}
 
         {campaigns.length === 0 ? (
           <div style={styles.empty}>
