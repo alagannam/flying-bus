@@ -222,13 +222,17 @@ export default async function DashboardPage() {
   // Service-role count — RLS limits the anon/youth view to own + published rows
   // and would undercount. head:true returns only the integer, never row data,
   // so this stays a number-only surface (no names ever rendered).
+  //
+  // Allow-list rather than not-equal: a 'rejected' submission was turned away,
+  // so it shouldn't inflate "kids who entered". An explicit list also prevents
+  // future submission_status values from silently counting.
   let participantCount = 0
   if (activeChallenge) {
     const { count } = await service
       .from('submissions')
       .select('id', { count: 'exact', head: true })
       .eq('challenge_id', activeChallenge.id)
-      .neq('status', 'draft')
+      .in('status', ['pending_parent_approval', 'pending_review', 'published'])
     participantCount = count ?? 0
   }
 
