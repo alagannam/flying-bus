@@ -59,21 +59,50 @@ function submissionDateLabel(s: {
   return `Saved ${formatDate(s.created_at)}`
 }
 
-// Calendar-day difference between now and endsAt.
-// null if endsAt is null or already past.
-function daysRemaining(endsAt: string | null): string | null {
+// Deadline countdown derived server-side from endsAt.
+//
+// Returns null if endsAt is null. Otherwise returns either a "closed" state
+// (when endsAt is in the past — shown instead of a countdown per spec) or a
+// "Closes <weekday> · 2d 14h" style label. The page is dynamic = force-dynamic
+// so the value is fresh on each request; we don't tick on the client.
+type CountdownState =
+  | { closed: true;  message: string }
+  | { closed: false; label:   string }
+
+function formatCountdown(endsAt: string | null): CountdownState | null {
   if (!endsAt) return null
+
   const end = new Date(endsAt)
   const now = new Date()
-  if (end.getTime() < now.getTime()) return null
+  if (end.getTime() <= now.getTime()) {
+    return { closed: true, message: 'This mission has closed' }
+  }
 
-  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
-  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const days = Math.round((endDay.getTime() - nowDay.getTime()) / (1000 * 60 * 60 * 24))
+  const ms     = end.getTime() - now.getTime()
+  const minute = 60_000
+  const hour   = 60 * minute
+  const day    = 24 * hour
+  const days   = Math.floor(ms / day)
+  const hours  = Math.floor((ms % day)  / hour)
+  const mins   = Math.floor((ms % hour) / minute)
 
-  if (days <= 0) return 'Ends today'
-  if (days === 1) return '1 day left'
-  return `${days} days left`
+  const weekday = end.toLocaleDateString('en-US', { weekday: 'short' })
+
+  let suffix: string
+  if (days >= 1)       suffix = `${days}d ${hours}h`
+  else if (hours >= 1) suffix = `${hours}h ${mins}m`
+  else                 suffix = `${Math.max(1, mins)}m`
+
+  return { closed: false, label: `Closes ${weekday} · ${suffix}` }
+}
+
+// Safety: this label is the ONLY surface for participation. We render a count
+// and a tone-appropriate string — never names, never a list. 0 reads as a CTA
+// rather than a discouraging "0 kids".
+function participationLabel(n: number): string {
+  if (n <= 0)  return 'Be the first to enter'
+  if (n === 1) return '1 kid has entered'
+  return `${n.toLocaleString('en-US')} kids have entered`
 }
 
 function pointsToNextLevel(currentLevel: number, score: number): number {
@@ -187,8 +216,21 @@ export default async function DashboardPage() {
   const visibleClubs = myClubs.slice(0, 5)
   const extraClubsCount = Math.max(0, myClubs.length - 5)
 
-  const daysLeft    = activeChallenge ? daysRemaining(activeChallenge.ends_at) : null
+  const countdown    = activeChallenge ? formatCountdown(activeChallenge.ends_at) : null
   const pointsToNext = pointsToNextLevel(profile.creator_level, profile.creator_score)
+
+  // Service-role count — RLS limits the anon/youth view to own + published rows
+  // and would undercount. head:true returns only the integer, never row data,
+  // so this stays a number-only surface (no names ever rendered).
+  let participantCount = 0
+  if (activeChallenge) {
+    const { count } = await service
+      .from('submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('challenge_id', activeChallenge.id)
+      .neq('status', 'draft')
+    participantCount = count ?? 0
+  }
 
   return (
     <div style={styles.page}>
@@ -221,9 +263,24 @@ export default async function DashboardPage() {
             {activeChallenge.description && (
               <p style={styles.challengeDesc}>{activeChallenge.description}</p>
             )}
-            {daysLeft && (
-              <span style={styles.daysBadge}>{daysLeft}</span>
+
+            {countdown?.closed ? (
+              <p style={styles.challengeClosed}>{countdown.message}</p>
+            ) : (
+              <div style={styles.challengeMeta}>
+                {countdown && (
+                  <span style={styles.metaItem}>
+                    <ClockIcon />
+                    <span>{countdown.label}</span>
+                  </span>
+                )}
+                <span style={styles.metaItem}>
+                  <PeopleIcon />
+                  <span>{participationLabel(participantCount)}</span>
+                </span>
+              </div>
             )}
+
             <div style={styles.challengeCtaRow}>
               <Link
                 href={`/studio/new?challenge_id=${activeChallenge.id}&challenge_slug=${activeChallenge.slug}`}
@@ -410,6 +467,33 @@ export default async function DashboardPage() {
   )
 }
 
+// Icons are inline SVGs (no new dep). Stroke uses the brand accent violet.
+const META_ACCENT = '#7C3AED'
+
+function ClockIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke={META_ACCENT} strokeWidth="2.4"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  )
+}
+
+function PeopleIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke={META_ACCENT} strokeWidth="2.4"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 20c0-3 3-5 6-5s6 2 6 5" />
+      <path d="M17 11a3 3 0 1 0 0-6" />
+      <path d="M21 20c0-2.6-2-4.5-4.5-4.9" />
+    </svg>
+  )
+}
+
 const subCardBase = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -496,14 +580,29 @@ const styles = {
     lineHeight: 'var(--leading-relaxed)',
     margin: 0,
   },
-  daysBadge: {
-    alignSelf: 'flex-start' as const,
-    padding: '2px var(--space-2)',
-    background: 'var(--color-warning-surface)',
-    color: 'var(--color-warning)',
-    borderRadius: 'var(--radius-full)',
+  challengeMeta: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: 'var(--space-4)',
+    marginTop: 'var(--space-1)',
+    alignItems: 'center',
+  },
+  metaItem: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
+    fontSize: 'var(--text-xs)',
+    fontWeight: 'var(--font-medium)',
+    color: '#312E81',
+  },
+  challengeClosed: {
+    marginTop: 'var(--space-1)',
     fontSize: 'var(--text-xs)',
     fontWeight: 'var(--font-semibold)',
+    color: '#6B6A8A',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+    margin: 0,
   },
   challengeCtaRow: {
     display: 'flex',
