@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { fetchActiveImpactCampaign } from '@/lib/impact'
 import { ImpactJourneyBar } from '@/components/ui/ImpactJourneyBar'
+import { computeWeeklyStreak } from '@/lib/streak'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Dashboard' }
@@ -163,7 +164,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileResult, subsResult, notifsResult, challengeResult, membershipsResult, activeCampaign] = await Promise.all([
+  const [profileResult, subsResult, notifsResult, challengeResult, membershipsResult, activeCampaign, streak] = await Promise.all([
     supabase
       .from('youth_profiles')
       .select('display_name, creator_level, coins_balance, creator_score, streak_current')
@@ -200,6 +201,8 @@ export default async function DashboardPage() {
       .eq('is_active', true),
 
     fetchActiveImpactCampaign(supabase),
+
+    computeWeeklyStreak(user.id),
   ])
 
   if (!profileResult.data) redirect('/login')
@@ -236,6 +239,20 @@ export default async function DashboardPage() {
     participantCount = count ?? 0
   }
 
+  // The at-risk nudge is tied to the live mission's deadline, not Sunday — kids
+  // think in missions, not calendar weeks. If there's no live, open mission to
+  // anchor the deadline, fall back to a generic "this week" phrasing.
+  function deadlineWeekday(endsAt: string | null): string | null {
+    if (!endsAt) return null
+    const end = new Date(endsAt)
+    if (end.getTime() <= Date.now()) return null
+    return end.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/Los_Angeles' })
+  }
+  const nudgeDeadline = activeChallenge ? deadlineWeekday(activeChallenge.ends_at) : null
+  const streakNudge = nudgeDeadline
+    ? `Post by ${nudgeDeadline} to keep your ${streak.weeks}-week streak.`
+    : `Post this week to keep your ${streak.weeks}-week streak.`
+
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -246,9 +263,31 @@ export default async function DashboardPage() {
             <h1 style={styles.greetingName}>
               Welcome back, {profile.display_name}
             </h1>
-            {profile.streak_current > 1 && (
+
+            {streak.weeks >= 1 && !streak.atRisk && (
               <p style={styles.streakLine}>
-                🔥 {profile.streak_current}-day streak — keep it going!
+                <FlameIcon />
+                <span style={styles.streakStrong}>
+                  {streak.weeks}-week streak
+                </span>
+                <span style={styles.streakMuted}> — keep it going!</span>
+              </p>
+            )}
+
+            {streak.weeks >= 1 && streak.atRisk && (
+              <p style={styles.streakLine}>
+                <FlameIcon />
+                <span style={styles.streakStrong}>
+                  {streak.weeks}-week streak alive
+                </span>
+                <span style={styles.streakMuted}> — {streakNudge}</span>
+              </p>
+            )}
+
+            {streak.weeks === 0 && (
+              <p style={styles.streakLine}>
+                <FlameIcon dim />
+                <span style={styles.streakMuted}>Start your streak this week.</span>
               </p>
             )}
           </div>
@@ -322,8 +361,11 @@ export default async function DashboardPage() {
           </div>
           <div style={styles.statCard}>
             <span style={styles.statEmoji}>🔥</span>
-            <p style={styles.statValue}>{profile.streak_current}</p>
-            <p style={styles.statLabel}>Day streak</p>
+            <p style={styles.statValue}>{streak.weeks}</p>
+            <p style={styles.statLabel}>Week streak</p>
+            {streak.atRisk && (
+              <p style={styles.statSubLabel}>At risk this week</p>
+            )}
           </div>
         </div>
 
@@ -498,6 +540,15 @@ function PeopleIcon() {
   )
 }
 
+function FlameIcon({ dim = false }: { dim?: boolean } = {}) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24"
+      fill={dim ? '#C9C7DC' : META_ACCENT} aria-hidden="true">
+      <path d="M13.5 2c0 3-2.5 4-2.5 7 0 1.5 1 2.5 2 2.5s1.5-.5 2-1.5c.5 1.5 2 2.5 2 5 0 3.5-2.5 6-5 6s-5-2.5-5-6c0-3 2-5 2-8 1 1 2 1.5 2.5 1 .5-.5.5-2-.5-3 1 0 2 .5 2.5-3z" />
+    </svg>
+  )
+}
+
 const subCardBase = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -538,9 +589,20 @@ const styles = {
     lineHeight: 'var(--leading-snug)',
   },
   streakLine: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
     fontSize: 'var(--text-sm)',
-    color: 'var(--color-text-secondary)',
+    color: '#6B6A8A',
     marginTop: 'var(--space-1)',
+    flexWrap: 'wrap' as const,
+  },
+  streakStrong: {
+    fontWeight: 'var(--font-bold)',
+    color: '#312E81',
+  },
+  streakMuted: {
+    color: '#6B6A8A',
   },
   levelBadge: {
     padding: 'var(--space-1) var(--space-3)',
